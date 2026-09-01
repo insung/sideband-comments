@@ -1,0 +1,37 @@
+{
+  "name": "sideband-comments",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/insung/sideband-comments.git"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b",
+    "build": "npm run typecheck && npm run build --workspaces --if-present",
+    "clean": "tsc -b --clean"
+  },
+  "devDependencies": {
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.38.6",
+    "@types/node": "^24.3.0",
+    "@types/vscode": "^1.134.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.25.9",
+    "obsidian": "^1.13.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

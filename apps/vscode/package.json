@@ -1,0 +1,66 @@
+{
+  "name": "sideband-comments-vscode",
+  "displayName": "Sideband Comments",
+  "description": "Shared sidecar comment threads for VS Code and Obsidian.",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "publisher": "insung",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/insung/sideband-comments.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other", "Visualization"],
+  "main": "./dist/extension.cjs",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "sidebandComments.add", "title": "Sideband Comments: Add Comment on Selection" },
+      { "command": "sidebandComments.create", "title": "Comment", "enablement": "!commentIsEmpty" },
+      { "command": "sidebandComments.resolve", "title": "Sideband Comments: Resolve" },
+      { "command": "sidebandComments.reopen", "title": "Sideband Comments: Reopen" },
+      { "command": "sidebandComments.reanchor", "title": "Sideband Comments: Re-anchor to Selection" },
+      { "command": "sidebandComments.reload", "title": "Sideband Comments: Reload" }
+    ],
+    "configuration": {
+      "title": "Sideband Comments",
+      "properties": {
+        "sidebandComments.authorName": {
+          "type": "string",
+          "default": "",
+          "description": "Comment author. Empty uses the operating-system user name."
+        },
+        "sidebandComments.showResolved": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep resolved threads visible in the editor."
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        { "command": "sidebandComments.add", "when": "editorHasSelection", "group": "navigation@20" }
+      ],
+      "comments/commentThread/title": [
+        { "command": "sidebandComments.resolve", "when": "commentThread == sideband.open", "group": "inline@1" },
+        { "command": "sidebandComments.reopen", "when": "commentThread == sideband.resolved", "group": "inline@1" },
+        { "command": "sidebandComments.reanchor", "group": "inline@2" }
+      ],
+      "comments/commentThread/context": [
+        { "command": "sidebandComments.create", "group": "inline" }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
+    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.1.0.vsix"
+  },
+  "dependencies": {
+    "@sideband-comments/core": "0.1.0",
+    "@sideband-comments/jsonl-store": "0.1.0"
+  }
+}

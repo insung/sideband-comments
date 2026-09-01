@@ -1,0 +1,17 @@
+{
+  "name": "@sideband-comments/migrate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "bin": {
+    "sideband-migrate": "dist/sideband-migrate.js"
+  },
+  "dependencies": {
+    "@sideband-comments/core": "0.1.0",
+    "@sideband-comments/jsonl-store": "0.1.0"
+  },
+  "scripts": {
+    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/sideband-migrate.js"
+  }
+}

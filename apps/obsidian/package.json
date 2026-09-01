@@ -1,0 +1,16 @@
+{
+  "name": "sideband-comments-obsidian",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --format=cjs --external:obsidian --external:@codemirror/state --external:@codemirror/view --outfile=dist/main.js && cp manifest.json styles.css dist/",
+    "package": "npm run build && zip -j dist/sideband-comments-obsidian-0.1.0.zip dist/main.js dist/manifest.json dist/styles.css"
+  },
+  "dependencies": {
+    "@sideband-comments/core": "0.1.0",
+    "@sideband-comments/jsonl-store": "0.1.0"
+  }
+}

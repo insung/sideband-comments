@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/jsonl-store" },
+    { "path": "packages/migrate" },
+    { "path": "apps/vscode" },
+    { "path": "apps/obsidian" }
+  ]
+}
