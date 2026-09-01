@@ -43,7 +43,7 @@ npm run build
 
 ```bash
 npm run package --workspace sideband-comments-vscode
-code --install-extension apps/vscode/dist/sideband-comments-vscode-0.1.0.vsix --force
+code --install-extension apps/vscode/dist/sideband-comments-vscode-0.1.2.vsix --force
 ```
 
 ### Obsidian package

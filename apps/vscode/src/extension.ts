@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { SidebandCommentController } from "./comments.js";
 import { mapRenamedDocument } from "./paths.js";
+import { SidebandCommentsView, type ThreadNode } from "./tree.js";
 import { WorkspaceComments } from "./workspace.js";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -13,23 +14,53 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
   refreshWorkspaces();
+  const tree = new SidebandCommentsView(context, () => [...workspaces.values()]);
 
   const workspaceFor = (uri: vscode.Uri) => {
     const folder = vscode.workspace.getWorkspaceFolder(uri);
     return folder ? workspaces.get(folder.uri.toString()) : undefined;
   };
   const comments = new SidebandCommentController(workspaceFor);
-  const register = (command: string, handler: (...args: never[]) => unknown) =>
-    context.subscriptions.push(vscode.commands.registerCommand(command, handler));
+  const register = (command: string, handler: (...args: any[]) => unknown) =>
+    context.subscriptions.push(vscode.commands.registerCommand(command, async (...args: any[]) => {
+      try {
+        return await handler(...args);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`Sideband Comments: ${message}`);
+        return undefined;
+      }
+    }));
 
-  register("sidebandComments.add", () => {
-    if (vscode.window.activeTextEditor) comments.addOnSelection(vscode.window.activeTextEditor);
+  register("sidebandComments.add", async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+    if (await comments.addOnSelection(editor)) {
+      tree.refresh();
+      await vscode.commands.executeCommand("sidebandComments.comments.focus");
+    }
   });
-  register("sidebandComments.create", (reply: vscode.CommentReply) => comments.submit(reply));
-  register("sidebandComments.resolve", (thread: vscode.CommentThread) => comments.setStatus(thread, "resolved"));
-  register("sidebandComments.reopen", (thread: vscode.CommentThread) => comments.setStatus(thread, "open"));
-  register("sidebandComments.reanchor", (thread: vscode.CommentThread) => comments.reanchor(thread));
-  register("sidebandComments.reload", () => comments.reloadVisible());
+  register("sidebandComments.create", async (reply: vscode.CommentReply) => {
+    await comments.submit(reply);
+    tree.refresh();
+  });
+  register("sidebandComments.resolve", async (thread: vscode.CommentThread) => {
+    await comments.setStatus(thread, "resolved");
+    tree.refresh();
+  });
+  register("sidebandComments.reopen", async (thread: vscode.CommentThread) => {
+    await comments.setStatus(thread, "open");
+    tree.refresh();
+  });
+  register("sidebandComments.reanchor", async (thread: vscode.CommentThread) => {
+    await comments.reanchor(thread);
+    tree.refresh();
+  });
+  register("sidebandComments.reload", async () => {
+    await comments.reloadVisible();
+    tree.refresh();
+  });
+  register("sidebandComments.openThread", (node: ThreadNode) => tree.openThread(node));
 
   const watcher = vscode.workspace.createFileSystemWatcher("**/.comments/threads/*.jsonl");
   let reloadTimer: NodeJS.Timeout | undefined;
@@ -38,6 +69,7 @@ export function activate(context: vscode.ExtensionContext): void {
     reloadTimer = setTimeout(() => {
       reloadTimer = undefined;
       void comments.reloadVisible();
+      tree.refresh();
     }, 100);
   };
   watcher.onDidCreate(scheduleReload);
@@ -46,11 +78,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     comments,
+    tree,
     watcher,
     { dispose: () => { if (reloadTimer) clearTimeout(reloadTimer); } },
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       refreshWorkspaces();
       void comments.reloadVisible();
+      tree.refresh();
     }),
     vscode.workspace.onDidSaveTextDocument((document) => void comments.load(document)),
     vscode.workspace.onDidRenameFiles(async ({ files }) => {
@@ -73,6 +107,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
       }
       await comments.reloadVisible();
+      tree.refresh();
     })
   );
 }

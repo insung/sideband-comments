@@ -2,7 +2,7 @@
   "name": "sideband-comments-vscode",
   "displayName": "Sideband Comments",
   "description": "Shared sidecar comment threads for VS Code and Obsidian.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "publisher": "insung",
@@ -12,7 +12,7 @@
     "url": "https://github.com/insung/sideband-comments.git"
   },
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.106.0"
   },
   "categories": ["Other", "Visualization"],
   "main": "./dist/extension.cjs",
@@ -24,8 +24,23 @@
       { "command": "sidebandComments.resolve", "title": "Sideband Comments: Resolve" },
       { "command": "sidebandComments.reopen", "title": "Sideband Comments: Reopen" },
       { "command": "sidebandComments.reanchor", "title": "Sideband Comments: Re-anchor to Selection" },
-      { "command": "sidebandComments.reload", "title": "Sideband Comments: Reload" }
+      { "command": "sidebandComments.reload", "title": "Sideband Comments: Reload", "icon": "$(refresh)" }
     ],
+    "viewsContainers": {
+      "secondarySidebar": [
+        { "id": "sidebandComments", "title": "Sideband Comments", "icon": "$(comment-discussion)" }
+      ]
+    },
+    "views": {
+      "sidebandComments": [
+        {
+          "id": "sidebandComments.comments",
+          "name": "Sideband Comments",
+          "contextualTitle": "Sideband Comments",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
     "configuration": {
       "title": "Sideband Comments",
       "properties": {
@@ -43,7 +58,10 @@
     },
     "menus": {
       "editor/context": [
-        { "command": "sidebandComments.add", "when": "editorHasSelection", "group": "navigation@20" }
+        { "command": "sidebandComments.add", "when": "editorHasSelection", "group": "z_commands@100" }
+      ],
+      "view/title": [
+        { "command": "sidebandComments.reload", "when": "view == sidebandComments.comments", "group": "navigation" }
       ],
       "comments/commentThread/title": [
         { "command": "sidebandComments.resolve", "when": "commentThread == sideband.open", "group": "inline@1" },
@@ -57,7 +75,7 @@
   },
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
-    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.1.0.vsix"
+    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.1.2.vsix"
   },
   "dependencies": {
     "@sideband-comments/core": "0.1.0",
