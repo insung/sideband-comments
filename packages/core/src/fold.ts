@@ -20,11 +20,13 @@ export function foldThread(input: readonly ThreadEvent[]): ThreadState {
     createdAt: created.occurredAt,
     body: created.body
   }];
+  const deletedCommentIds = new Set<string>();
   const state: ThreadState = {
     id: created.threadId,
     documentPath: created.documentPath,
     anchor: created.anchor,
     status: "open",
+    deleted: false,
     comments,
     revision: created.revision,
     updatedAt: created.occurredAt
@@ -38,6 +40,9 @@ export function foldThread(input: readonly ThreadEvent[]): ThreadState {
       case "comment.replied":
         state.comments.push({ id: event.eventId, author: event.actor, createdAt: event.occurredAt, body: event.body });
         break;
+      case "comment.deleted":
+        deletedCommentIds.add(event.commentId);
+        break;
       case "thread.resolved":
         state.status = "resolved";
         break;
@@ -49,6 +54,9 @@ export function foldThread(input: readonly ThreadEvent[]): ThreadState {
         break;
       case "thread.relocated":
         state.documentPath = event.documentPath;
+        break;
+      case "thread.deleted":
+        state.deleted = true;
         break;
       case "suggestion.proposed":
         state.suggestion = {
@@ -65,5 +73,6 @@ export function foldThread(input: readonly ThreadEvent[]): ThreadState {
         break;
     }
   }
+  state.comments = state.comments.filter((comment) => !deletedCommentIds.has(comment.id));
   return state;
 }

@@ -7,6 +7,7 @@ const thread: ThreadState = {
   documentPath: "note.md",
   anchor: { exact: "target", prefix: "", suffix: "", position: 0 },
   status: "open",
+  deleted: false,
   comments: [{
     id: "c1",
     author: { id: "user", name: "User" },

@@ -22,6 +22,10 @@ export const createEventFactory = {
   replied(input: BaseInput & { body: string }): ThreadEvent {
     return { ...base(input), type: "comment.replied", body: input.body };
   },
+  commentDeleted(input: BaseInput & { commentId: string }): ThreadEvent {
+    if (!input.commentId) throw new Error("comment id is required");
+    return { ...base(input), type: "comment.deleted", commentId: input.commentId };
+  },
   resolved(input: BaseInput): ThreadEvent {
     return { ...base(input), type: "thread.resolved" };
   },
@@ -33,6 +37,9 @@ export const createEventFactory = {
   },
   relocated(input: BaseInput & { documentPath: string }): ThreadEvent {
     return { ...base(input), type: "thread.relocated", documentPath: input.documentPath };
+  },
+  deleted(input: BaseInput): ThreadEvent {
+    return { ...base(input), type: "thread.deleted" };
   },
   suggestionProposed(input: BaseInput & { replacement: string }): ThreadEvent {
     return { ...base(input), type: "suggestion.proposed", replacement: input.replacement };

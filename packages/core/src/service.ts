@@ -76,6 +76,18 @@ export class CommentService {
     return this.get(threadId);
   }
 
+  async deleteComment(threadId: string, commentId: string): Promise<ThreadState> {
+    const current = await this.get(threadId);
+    if (!current.comments.some((comment) => comment.id === commentId)) {
+      throw new Error(`comment not found: ${commentId}`);
+    }
+    await this.repository.append(createEventFactory.commentDeleted({
+      ...this.eventBase(threadId, await this.revision(threadId)),
+      commentId
+    }));
+    return this.get(threadId);
+  }
+
   async resolve(threadId: string): Promise<ThreadState> {
     await this.repository.append(createEventFactory.resolved(this.eventBase(threadId, await this.revision(threadId))));
     return this.get(threadId);
@@ -99,6 +111,13 @@ export class CommentService {
       ...this.eventBase(threadId, await this.revision(threadId)),
       documentPath: normalizeDocumentPath(documentPath)
     }));
+    return this.get(threadId);
+  }
+
+  async delete(threadId: string): Promise<ThreadState> {
+    await this.repository.append(createEventFactory.deleted(
+      this.eventBase(threadId, await this.revision(threadId))
+    ));
     return this.get(threadId);
   }
 

@@ -7,6 +7,11 @@ import {
   type ThreadEvent,
   type ThreadState
 } from "@sideband-comments/core";
+import {
+  convertAnchoredV2Events,
+  isAnchoredV2Event,
+  type AnchoredV2Event
+} from "./anchored-v2.js";
 
 const THREAD_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -83,16 +88,26 @@ export class JsonlThreadRepository {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
       throw error;
     }
-    return raw.split(/\r?\n/).filter((line) => line.trim()).map((line, index) => {
+    const sideband: ThreadEvent[] = [];
+    const anchored: AnchoredV2Event[] = [];
+    raw.split(/\r?\n/).forEach((line, index) => {
+      if (!line.trim()) return;
       let value: unknown;
       try {
         value = JSON.parse(line);
       } catch {
         throw new Error(`${file}:${index + 1}: invalid JSON`);
       }
-      if (!isThreadEvent(value)) throw new Error(`${file}:${index + 1}: invalid sideband event`);
-      return value;
+      if (isThreadEvent(value)) sideband.push(value);
+      else if (isAnchoredV2Event(value)) anchored.push(value);
+      else throw new Error(`${file}:${index + 1}: invalid sideband or Anchored Comments v2 event`);
     });
+    try {
+      return [...convertAnchoredV2Events(anchored, threadId), ...sideband];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${file}: invalid Anchored Comments v2 log: ${message}`);
+    }
   }
 
   async read(threadId: string): Promise<ThreadState | undefined> {
@@ -110,7 +125,7 @@ export class JsonlThreadRepository {
     }
     const ids = entries.filter((entry) => entry.endsWith(".jsonl")).map((entry) => entry.slice(0, -6)).sort();
     const states = await Promise.all(ids.map((id) => this.read(id)));
-    return states.filter((state): state is ThreadState => state !== undefined);
+    return states.filter((state): state is ThreadState => state !== undefined && !state.deleted && state.comments.length > 0);
   }
 
   async listByDocument(documentPath: string): Promise<ThreadState[]> {

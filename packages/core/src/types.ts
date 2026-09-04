@@ -47,6 +47,11 @@ export interface CommentRepliedEvent extends EventBase {
   body: string;
 }
 
+export interface CommentDeletedEvent extends EventBase {
+  type: "comment.deleted";
+  commentId: string;
+}
+
 export interface ThreadResolvedEvent extends EventBase {
   type: "thread.resolved";
 }
@@ -65,6 +70,10 @@ export interface ThreadRelocatedEvent extends EventBase {
   documentPath: string;
 }
 
+export interface ThreadDeletedEvent extends EventBase {
+  type: "thread.deleted";
+}
+
 export interface SuggestionProposedEvent extends EventBase {
   type: "suggestion.proposed";
   replacement: string;
@@ -81,10 +90,12 @@ export interface SuggestionDeclinedEvent extends EventBase {
 export type ThreadEvent =
   | ThreadCreatedEvent
   | CommentRepliedEvent
+  | CommentDeletedEvent
   | ThreadResolvedEvent
   | ThreadReopenedEvent
   | ThreadReanchoredEvent
   | ThreadRelocatedEvent
+  | ThreadDeletedEvent
   | SuggestionProposedEvent
   | SuggestionAcceptedEvent
   | SuggestionDeclinedEvent;
@@ -94,6 +105,7 @@ export interface ThreadState {
   documentPath: string;
   anchor: QuoteAnchor;
   status: "open" | "resolved";
+  deleted: boolean;
   comments: ThreadComment[];
   suggestion?: Suggestion;
   revision: number;

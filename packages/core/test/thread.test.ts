@@ -46,7 +46,8 @@ describe("thread event fold", () => {
         occurredAt: at,
         actor,
         anchor: { exact: "new", prefix: "", suffix: "", position: 5 }
-      })
+      }),
+      createEventFactory.deleted({ eventId: "e5", threadId: "t1", revision: 5, occurredAt: at, actor })
     ];
 
     const thread = foldThread(events);
@@ -54,6 +55,7 @@ describe("thread event fold", () => {
     expect(thread.documentPath).toBe("docs/new.md");
     expect(thread.anchor.exact).toBe("new");
     expect(thread.comments.map((comment) => comment.body)).toEqual(["검토해줘", "확인했어"]);
+    expect(thread.deleted).toBe(true);
   });
 
   it("is deterministic for merged logs and ignores duplicate event ids", () => {
@@ -88,5 +90,38 @@ describe("thread event fold", () => {
     const second = foldThread([replyB, replyA, created]);
     expect(first).toEqual(second);
     expect(first.comments.map((comment) => comment.body)).toEqual(["first", "B", "A"]);
+  });
+
+  it("removes only the targeted comment while retaining the thread", () => {
+    const created = createEventFactory.created({
+      eventId: "created",
+      threadId: "t1",
+      revision: 0,
+      occurredAt: at,
+      actor,
+      documentPath: "README.md",
+      anchor: { exact: "text", prefix: "", suffix: "", position: 0 },
+      body: "first"
+    });
+    const reply = createEventFactory.replied({
+      eventId: "reply",
+      threadId: "t1",
+      revision: 1,
+      occurredAt: at,
+      actor,
+      body: "second"
+    });
+    const deleted = createEventFactory.commentDeleted({
+      eventId: "delete",
+      threadId: "t1",
+      revision: 2,
+      occurredAt: at,
+      actor,
+      commentId: "reply"
+    });
+
+    const state = foldThread([created, reply, deleted]);
+    expect(state.comments.map((comment) => comment.body)).toEqual(["first"]);
+    expect(state.deleted).toBe(false);
   });
 });

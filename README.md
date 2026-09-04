@@ -12,9 +12,7 @@ Markdown and source files remain unchanged when a comment is created, replied to
 
 ## Why
 
-Tandem Comments stores JSON in a fenced block at the end of each Markdown note. That makes comments portable, but it also changes the note, produces document diffs for review-only activity, and exposes the raw block when the plugin is unavailable.
-
-Anchored Comments uses sidecar JSONL for code, but its agent dispatch, MCP, skills, session provenance, and queue features are outside this project's scope. Sideband Comments keeps only the human comment workflow and applies the same storage protocol to Markdown and code.
+Sideband Comments is inspired by Tandem Comments and Anchored Comments.
 
 ## Architecture
 
@@ -43,7 +41,7 @@ npm run build
 
 ```bash
 npm run package --workspace sideband-comments-vscode
-code --install-extension apps/vscode/dist/sideband-comments-vscode-0.1.2.vsix --force
+code --install-extension apps/vscode/dist/sideband-comments-vscode-0.1.8.vsix --force
 ```
 
 ### Obsidian package

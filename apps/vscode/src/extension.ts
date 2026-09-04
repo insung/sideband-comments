@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { SidebandCommentController } from "./comments.js";
 import { mapRenamedDocument } from "./paths.js";
-import { SidebandCommentsView, type ThreadNode } from "./tree.js";
+import { SidebandCommentsView } from "./tree.js";
 import { WorkspaceComments } from "./workspace.js";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -21,6 +21,8 @@ export function activate(context: vscode.ExtensionContext): void {
     return folder ? workspaces.get(folder.uri.toString()) : undefined;
   };
   const comments = new SidebandCommentController(workspaceFor);
+  const showResolved = () => vscode.workspace.getConfiguration("sidebandComments").get("showResolved", true);
+  void vscode.commands.executeCommand("setContext", "sidebandComments.showResolved", showResolved());
   const register = (command: string, handler: (...args: any[]) => unknown) =>
     context.subscriptions.push(vscode.commands.registerCommand(command, async (...args: any[]) => {
       try {
@@ -37,7 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!editor) return;
     if (await comments.addOnSelection(editor)) {
       tree.refresh();
-      await vscode.commands.executeCommand("sidebandComments.comments.focus");
+      await vscode.commands.executeCommand("commentsView.focus");
     }
   });
   register("sidebandComments.create", async (reply: vscode.CommentReply) => {
@@ -56,11 +58,25 @@ export function activate(context: vscode.ExtensionContext): void {
     await comments.reanchor(thread);
     tree.refresh();
   });
+  register("sidebandComments.deleteComment", async (comment: vscode.Comment) => {
+    if (await comments.deleteComment(comment)) tree.refresh();
+  });
+  const setShowResolved = async (value: boolean) => {
+    await vscode.workspace.getConfiguration("sidebandComments").update(
+      "showResolved",
+      value,
+      vscode.ConfigurationTarget.Workspace
+    );
+    await vscode.commands.executeCommand("setContext", "sidebandComments.showResolved", value);
+    await comments.reloadActive();
+    tree.refresh();
+  };
+  register("sidebandComments.showResolved", () => setShowResolved(true));
+  register("sidebandComments.hideResolved", () => setShowResolved(false));
   register("sidebandComments.reload", async () => {
-    await comments.reloadVisible();
+    await comments.reloadActive();
     tree.refresh();
   });
-  register("sidebandComments.openThread", (node: ThreadNode) => tree.openThread(node));
 
   const watcher = vscode.workspace.createFileSystemWatcher("**/.comments/threads/*.jsonl");
   let reloadTimer: NodeJS.Timeout | undefined;
@@ -68,7 +84,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       reloadTimer = undefined;
-      void comments.reloadVisible();
+      void comments.reloadActive();
       tree.refresh();
     }, 100);
   };
@@ -83,10 +99,18 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: () => { if (reloadTimer) clearTimeout(reloadTimer); } },
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       refreshWorkspaces();
-      void comments.reloadVisible();
+      void comments.reloadActive();
       tree.refresh();
     }),
-    vscode.workspace.onDidSaveTextDocument((document) => void comments.load(document)),
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      if (vscode.window.activeTextEditor?.document.uri.toString() === document.uri.toString()) void comments.load(document);
+    }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration("sidebandComments.showResolved")) return;
+      void vscode.commands.executeCommand("setContext", "sidebandComments.showResolved", showResolved());
+      void comments.reloadActive();
+      tree.refresh();
+    }),
     vscode.workspace.onDidRenameFiles(async ({ files }) => {
       refreshWorkspaces();
       for (const { oldUri, newUri } of files) {
@@ -106,7 +130,7 @@ export function activate(context: vscode.ExtensionContext): void {
           if (destination) await workspace.service.relocate(thread.id, destination);
         }
       }
-      await comments.reloadVisible();
+      await comments.reloadActive();
       tree.refresh();
     })
   );

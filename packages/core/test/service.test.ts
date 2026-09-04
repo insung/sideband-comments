@@ -43,16 +43,18 @@ describe("CommentService", () => {
       anchor: { exact: "hello", prefix: "", suffix: "", position: 0 },
       body: "first"
     });
-    await service.reply(created.id, "second");
+    const replied = await service.reply(created.id, "second");
     await service.resolve(created.id);
     await service.reopen(created.id);
     await service.relocateDocument("docs/a.md", "docs/moved.md");
+    await service.deleteComment(created.id, replied.comments[1]!.id);
 
     const state = foldThread(await repository.readEvents(created.id));
     expect(state.status).toBe("open");
     expect(state.documentPath).toBe("docs/moved.md");
-    expect(state.comments.map((comment) => comment.body)).toEqual(["first", "second"]);
-    expect(state.revision).toBe(4);
+    expect(state.comments.map((comment) => comment.body)).toEqual(["first"]);
+    expect(state.revision).toBe(5);
+    expect(state.deleted).toBe(false);
   });
 
   it("rejects blank comments", async () => {
