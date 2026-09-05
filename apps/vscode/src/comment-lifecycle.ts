@@ -17,6 +17,23 @@ export function planVisibleDocumentSync(
   };
 }
 
+export function planActiveDocumentSync(
+  activeKey: string | null | undefined,
+  loadedKeys: readonly string[],
+  loadingKeys: readonly string[]
+): VisibleDocumentSyncPlan {
+  if (activeKey === undefined) return { load: [], unload: [] };
+  return planVisibleDocumentSync(activeKey === null ? [] : [activeKey], loadedKeys, loadingKeys);
+}
+
+export function commentRenderSignature(
+  documentVersion: number,
+  showResolved: boolean,
+  threads: readonly unknown[]
+): string {
+  return JSON.stringify({ documentVersion, showResolved, threads });
+}
+
 export class KeyedSingleFlight {
   private readonly running = new Map<string, Promise<void>>();
 

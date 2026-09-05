@@ -53,6 +53,7 @@ describe("thread event fold", () => {
     const thread = foldThread(events);
     expect(thread.status).toBe("resolved");
     expect(thread.documentPath).toBe("docs/new.md");
+    expect(thread.originalAnchor.exact).toBe("old");
     expect(thread.anchor.exact).toBe("new");
     expect(thread.comments.map((comment) => comment.body)).toEqual(["검토해줘", "확인했어"]);
     expect(thread.deleted).toBe(true);

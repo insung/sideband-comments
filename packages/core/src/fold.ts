@@ -24,6 +24,7 @@ export function foldThread(input: readonly ThreadEvent[]): ThreadState {
   const state: ThreadState = {
     id: created.threadId,
     documentPath: created.documentPath,
+    originalAnchor: created.anchor,
     anchor: created.anchor,
     status: "open",
     deleted: false,

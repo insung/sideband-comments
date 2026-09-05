@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { setSidebandHighlights, sidebandHighlightField } from "./highlight.js";
 import { DEFAULT_SETTINGS, SidebandSettingTab, type SidebandSettings } from "./settings.js";
 import { SIDEBAND_VIEW_TYPE, SidebandSidebarView } from "./sidebar.js";
-import { buildThreadViewModels } from "./view-model.js";
+import { buildThreadViewModels, type ThreadViewModel } from "./view-model.js";
 
 class TextPromptModal extends Modal {
   private value: string | undefined;
@@ -129,8 +129,38 @@ export default class SidebandCommentsPlugin extends Plugin {
     return buildThreadViewModels(markdown, threads, this.settings.showResolved);
   }
 
+  async allModels(): Promise<ThreadViewModel[]> {
+    const threads = await this.repository.list();
+    const byDocument = new Map<string, typeof threads>();
+    for (const thread of threads) {
+      const documentThreads = byDocument.get(thread.documentPath) ?? [];
+      documentThreads.push(thread);
+      byDocument.set(thread.documentPath, documentThreads);
+    }
+    const models = await Promise.all([...byDocument.entries()].map(async ([path, documentThreads]) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      const markdown = file instanceof TFile ? await this.app.vault.cachedRead(file) : "";
+      return buildThreadViewModels(markdown, documentThreads, this.settings.showResolved);
+    }));
+    return models.flat();
+  }
+
+  activeDocumentPath(): string | undefined {
+    return this.app.workspace.getActiveFile()?.path;
+  }
+
+  private markdownView(path?: string): MarkdownView | undefined {
+    const active = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (active?.file && (!path || active.file.path === path)) return active;
+    const target = path ?? this.app.workspace.getActiveFile()?.path;
+    if (!target) return undefined;
+    return this.app.workspace.getLeavesOfType("markdown")
+      .map((leaf) => leaf.view)
+      .find((candidate): candidate is MarkdownView => candidate instanceof MarkdownView && candidate.file?.path === target);
+  }
+
   async addCommentFromSelection(): Promise<void> {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const view = this.markdownView();
     if (!view?.file) return;
     const selection = view.editor.getSelection();
     if (!selection) {
@@ -148,7 +178,7 @@ export default class SidebandCommentsPlugin extends Plugin {
   }
 
   async reanchorFromSelection(threadId: string): Promise<boolean> {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const view = this.markdownView();
     if (!view?.file || !view.editor.getSelection()) return false;
     const markdown = view.editor.getValue();
     await this.service.reanchor(threadId, captureAnchor(
@@ -162,7 +192,7 @@ export default class SidebandCommentsPlugin extends Plugin {
 
   async refresh(): Promise<void> {
     if (!this.repository) return;
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const view = this.markdownView();
     if (view?.file) {
       const models = await this.modelsFor(view.file.path, view.editor.getValue());
       const editorView = (view.editor as unknown as { cm?: EditorView }).cm;
@@ -174,6 +204,25 @@ export default class SidebandCommentsPlugin extends Plugin {
       const sidebar = leaf.view;
       if (sidebar instanceof SidebandSidebarView) await sidebar.render();
     }
+  }
+
+  async openThread(documentPath: string, threadId: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(documentPath);
+    if (!(file instanceof TFile)) {
+      new Notice(`Cannot open comment file: ${documentPath}`);
+      return;
+    }
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file);
+    const view = leaf.view instanceof MarkdownView ? leaf.view : this.markdownView(documentPath);
+    if (!view) return;
+    const model = (await this.modelsFor(documentPath, view.editor.getValue())).find((candidate) => candidate.id === threadId);
+    if (!model?.range) return;
+    const from = view.editor.offsetToPos(model.range.start);
+    const to = view.editor.offsetToPos(model.range.end);
+    view.editor.setSelection(from, to);
+    view.editor.scrollIntoView({ from, to }, true);
+    view.editor.focus();
   }
 
   private async openSidebar(): Promise<void> {

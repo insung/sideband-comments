@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadState } from "@sideband-comments/core";
-import { buildThreadViewModels } from "../src/view-model.js";
+import { buildThreadViewModels, groupThreadViewModels } from "../src/view-model.js";
 
 const thread: ThreadState = {
   id: "t1",
   documentPath: "note.md",
+  originalAnchor: { exact: "target", prefix: "", suffix: "", position: 0 },
   anchor: { exact: "target", prefix: "", suffix: "", position: 0 },
   status: "open",
   deleted: false,
@@ -28,5 +29,20 @@ describe("Obsidian sidebar view model", () => {
     const resolved = { ...thread, id: "t2", status: "resolved" as const };
     expect(buildThreadViewModels("target", [thread, resolved], false).map((item) => item.id)).toEqual(["t1"]);
     expect(buildThreadViewModels("target", [thread, resolved], true)).toHaveLength(2);
+  });
+
+  it("groups vault-wide comments by document path", () => {
+    const models = [
+      ...buildThreadViewModels("target", [{ ...thread, id: "b", documentPath: "notes/b.md" }]),
+      ...buildThreadViewModels("target", [{ ...thread, id: "a", documentPath: "notes/a.md" }])
+    ];
+
+    expect(groupThreadViewModels(models).map((group) => ({
+      path: group.documentPath,
+      ids: group.threads.map((item) => item.id)
+    }))).toEqual([
+      { path: "notes/a.md", ids: ["a"] },
+      { path: "notes/b.md", ids: ["b"] }
+    ]);
   });
 });

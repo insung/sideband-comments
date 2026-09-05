@@ -3,8 +3,62 @@
   border-bottom: 1px dotted var(--color-yellow);
 }
 
+.markdown-source-view.mod-cm6 .cm-gutterElement.sideband-gutter-line {
+  color: var(--color-yellow);
+  background-color: color-mix(in srgb, var(--color-yellow) 22%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-yellow);
+}
+
+.markdown-source-view.mod-cm6 .cm-gutterElement.sideband-gutter-line.is-resolved {
+  opacity: 0.55;
+}
+
 .sideband-sidebar {
   padding: 12px;
+}
+
+.sideband-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sideband-sidebar-header h3 {
+  margin: 0;
+}
+
+.sideband-document {
+  margin-bottom: 8px;
+}
+
+.sideband-document-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sideband-document-summary > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sideband-document-count {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 400;
+}
+
+.sideband-document-threads {
+  padding-left: 8px;
 }
 
 .sideband-thread {
@@ -19,6 +73,7 @@
 
 .sideband-thread blockquote {
   margin: 6px 0;
+  cursor: pointer;
 }
 
 .sideband-comment {

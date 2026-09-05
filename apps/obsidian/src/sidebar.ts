@@ -1,10 +1,14 @@
-import { ItemView, MarkdownRenderer, MarkdownView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from "obsidian";
 import type { ThreadViewModel } from "./view-model.js";
+import { groupThreadViewModels } from "./view-model.js";
 import type SidebandCommentsPlugin from "./main.js";
 
 export const SIDEBAND_VIEW_TYPE = "sideband-comments-sidebar";
 
 export class SidebandSidebarView extends ItemView {
+  private readonly expandedDocuments = new Set<string>();
+  private renderRevision = 0;
+
   constructor(leaf: WorkspaceLeaf, private readonly plugin: SidebandCommentsPlugin) {
     super(leaf);
   }
@@ -26,39 +30,48 @@ export class SidebandSidebarView extends ItemView {
   }
 
   async render(): Promise<void> {
+    const revision = ++this.renderRevision;
+    const models = await this.plugin.allModels();
+    if (revision !== this.renderRevision) return;
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("sideband-sidebar");
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view?.file) {
-      container.createEl("p", { text: "Open a Markdown note to view its comments." });
-      return;
-    }
-    const models = await this.plugin.modelsFor(view.file.path, view.editor.getValue());
+    const groups = groupThreadViewModels(models);
     const heading = container.createDiv({ cls: "sideband-sidebar-header" });
     heading.createEl("h3", { text: `Comments (${models.length})` });
     const add = heading.createEl("button", { text: "Add from selection" });
     add.addEventListener("click", () => void this.plugin.addCommentFromSelection());
     if (models.length === 0) {
-      container.createEl("p", { text: "No comments for this note." });
+      container.createEl("p", { text: "No comments in this vault." });
       return;
     }
-    for (const model of models) await this.renderThread(container, model, view);
+    const activePath = this.plugin.activeDocumentPath();
+    for (const group of groups) {
+      const section = container.createEl("details", { cls: "sideband-document" });
+      section.open = this.expandedDocuments.has(group.documentPath) || group.documentPath === activePath;
+      section.addEventListener("toggle", () => {
+        if (section.open) this.expandedDocuments.add(group.documentPath);
+        else this.expandedDocuments.delete(group.documentPath);
+      });
+      const summary = section.createEl("summary", { cls: "sideband-document-summary" });
+      summary.createSpan({ text: group.documentPath });
+      summary.createSpan({
+        cls: "sideband-document-count",
+        text: `${group.threads.length} comment${group.threads.length === 1 ? "" : "s"}`
+      });
+      const threads = section.createDiv({ cls: "sideband-document-threads" });
+      for (const model of group.threads) await this.renderThread(threads, model);
+    }
   }
 
-  private async renderThread(container: HTMLElement, model: ThreadViewModel, view: MarkdownView): Promise<void> {
+  private async renderThread(container: HTMLElement, model: ThreadViewModel): Promise<void> {
     const card = container.createDiv({ cls: `sideband-thread${model.status === "resolved" ? " is-resolved" : ""}` });
     const title = card.createDiv();
     title.createEl("strong", { text: model.status === "resolved" ? "✓ Resolved" : "Open" });
     if (model.anchorState !== "resolved") title.createSpan({ text: ` · ⚠ ${model.anchorState}` });
     const quote = card.createEl("blockquote", { text: model.anchor.exact });
     if (model.range) {
-      quote.addEventListener("click", () => {
-        const from = view.editor.offsetToPos(model.range!.start);
-        const to = view.editor.offsetToPos(model.range!.end);
-        view.editor.setSelection(from, to);
-        view.editor.focus();
-      });
+      quote.addEventListener("click", () => void this.plugin.openThread(model.documentPath, model.id));
     }
     for (const comment of model.comments) {
       const item = card.createDiv({ cls: "sideband-comment" });

@@ -5,6 +5,11 @@ export interface ThreadViewModel extends ThreadState {
   range?: { start: number; end: number };
 }
 
+export interface DocumentThreadViewModel {
+  documentPath: string;
+  threads: ThreadViewModel[];
+}
+
 export function buildThreadViewModels(
   markdown: string,
   threads: readonly ThreadState[],
@@ -22,4 +27,16 @@ export function buildThreadViewModels(
       };
     })
     .sort((a, b) => (a.range?.start ?? Number.MAX_SAFE_INTEGER) - (b.range?.start ?? Number.MAX_SAFE_INTEGER));
+}
+
+export function groupThreadViewModels(models: readonly ThreadViewModel[]): DocumentThreadViewModel[] {
+  const groups = new Map<string, ThreadViewModel[]>();
+  for (const model of models) {
+    const threads = groups.get(model.documentPath) ?? [];
+    threads.push(model);
+    groups.set(model.documentPath, threads);
+  }
+  return [...groups.entries()]
+    .map(([documentPath, threads]) => ({ documentPath, threads }))
+    .sort((left, right) => left.documentPath.localeCompare(right.documentPath));
 }

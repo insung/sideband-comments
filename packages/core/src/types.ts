@@ -103,6 +103,7 @@ export type ThreadEvent =
 export interface ThreadState {
   id: string;
   documentPath: string;
+  originalAnchor: QuoteAnchor;
   anchor: QuoteAnchor;
   status: "open" | "resolved";
   deleted: boolean;

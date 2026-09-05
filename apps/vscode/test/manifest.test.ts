@@ -54,4 +54,10 @@ describe("VS Code contributions", () => {
       expect.objectContaining({ command: "sidebandComments.hideResolved", when: expect.stringContaining("workbench.panel.comments") })
     ]));
   });
+
+  it("does not require a separate original-text diff action", () => {
+    expect(manifest.contributes.commands?.some(
+      (command) => command.command === "sidebandComments.showOriginalDiff"
+    )).toBe(false);
+  });
 });
