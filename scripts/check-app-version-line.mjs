@@ -21,7 +21,13 @@ function requireArtifactVersion(label, packageJson, suffix) {
   }
 }
 
-export function assertAppVersionPolicy({ vscodePackage, obsidianPackage, obsidianManifest }) {
+export function assertAppVersionPolicy({
+  vscodePackage,
+  obsidianPackage,
+  obsidianManifest,
+  rootObsidianManifest,
+  obsidianVersions
+}) {
   const vscode = parseVersion("VS Code", vscodePackage.version);
   const obsidian = parseVersion("Obsidian", obsidianPackage.version);
 
@@ -35,6 +41,14 @@ export function assertAppVersionPolicy({ vscodePackage, obsidianPackage, obsidia
       `Obsidian package and manifest versions must match exactly: ${obsidianPackage.version} != ${obsidianManifest.version}`
     );
   }
+  if (JSON.stringify(rootObsidianManifest) !== JSON.stringify(obsidianManifest)) {
+    throw new Error("Root and app Obsidian manifests must match exactly");
+  }
+  if (obsidianVersions[obsidian.version] !== obsidianManifest.minAppVersion) {
+    throw new Error(
+      `Obsidian versions.json must map ${obsidian.version} to ${obsidianManifest.minAppVersion}`
+    );
+  }
 
   requireArtifactVersion("sideband-comments-vscode", vscodePackage, "vsix");
   requireArtifactVersion("sideband-comments-obsidian", obsidianPackage, "zip");
@@ -45,7 +59,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const result = assertAppVersionPolicy({
     vscodePackage: readJson("apps/vscode/package.json"),
     obsidianPackage: readJson("apps/obsidian/package.json"),
-    obsidianManifest: readJson("apps/obsidian/manifest.json")
+    obsidianManifest: readJson("apps/obsidian/manifest.json"),
+    rootObsidianManifest: readJson("manifest.json"),
+    obsidianVersions: readJson("versions.json")
   });
   console.log(`App version policy passed: VS Code ${result.vscode}, Obsidian ${result.obsidian}`);
 }

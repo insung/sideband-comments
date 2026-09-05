@@ -1,0 +1,9 @@
+{
+  "id": "sideband-comments",
+  "name": "Sideband Comments",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "Document-grounded AI collaboration with shared comments across Obsidian and VS Code.",
+  "author": "insung",
+  "isDesktopOnly": true
+}
