@@ -31,10 +31,6 @@ export class SidebandSettingTab extends PluginSettingTab {
       .setName("Show resolved threads")
       .addToggle((toggle) => toggle
         .setValue(this.plugin.settings.showResolved)
-        .onChange(async (value) => {
-          this.plugin.settings.showResolved = value;
-          await this.plugin.saveSettings();
-          await this.plugin.refresh();
-        }));
+        .onChange((value) => this.plugin.setShowResolved(value)));
   }
 }

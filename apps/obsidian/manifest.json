@@ -1,7 +1,7 @@
 {
   "id": "sideband-comments",
   "name": "Sideband Comments",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
   "description": "Shared sidecar comment threads for Obsidian and VS Code.",
   "author": "insung",

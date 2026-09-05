@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 interface ExtensionManifest {
   contributes: {
     commands?: Array<{ command: string; title: string }>;
-    viewsContainers?: { activitybar?: Array<{ id: string; title: string }> };
-    views?: Record<string, Array<{ id: string; name: string; contextualTitle?: string }>>;
+    viewsContainers?: { secondarySidebar?: Array<{ id: string; title: string }> };
+    views?: Record<string, Array<{ id: string; name: string; contextualTitle?: string; type?: string }>>;
     menus: Record<string, Array<{ command: string; group: string; when?: string }>>;
   };
 }
@@ -15,17 +15,22 @@ const manifest = JSON.parse(
 ) as ExtensionManifest;
 
 describe("VS Code contributions", () => {
-  it("puts the Sideband Comments overview in the Primary Side Bar", () => {
-    expect(manifest.contributes.viewsContainers?.activitybar).toContainEqual(
+  it("stacks an explorer and detail editor in the Secondary Side Bar", () => {
+    expect(manifest.contributes.viewsContainers?.secondarySidebar).toContainEqual(
       expect.objectContaining({ id: "sideband-comments-overview", title: "Sideband Comments" })
     );
-    expect(manifest.contributes.views?.["sideband-comments-overview"]).toContainEqual(
+    expect(manifest.contributes.views?.["sideband-comments-overview"]).toEqual([
       expect.objectContaining({
         id: "sidebandComments.overviewView",
-        name: "Sideband Comments",
+        name: "Comments Explorer",
         contextualTitle: "Sideband Comments"
+      }),
+      expect.objectContaining({
+        id: "sidebandComments.detailView",
+        name: "Comment Details",
+        type: "webview"
       })
-    );
+    ]);
   });
 
   it("separates new comments from replies for the Sideband controller", () => {

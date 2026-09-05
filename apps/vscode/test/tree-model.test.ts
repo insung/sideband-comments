@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ThreadState } from "@sideband-comments/core";
 import {
   buildDocumentGroups,
-  buildThreadMessages,
   collectWorkspaceThreads,
-  commentCountLabel,
-  commentPreview
+  commentCountLabel
 } from "../src/tree-model.js";
 
 const thread = (overrides: Partial<ThreadState>): ThreadState => ({
@@ -66,40 +64,6 @@ describe("commentCountLabel", () => {
   it("formats singular and plural thread counts", () => {
     expect(commentCountLabel(1)).toBe("1 comment");
     expect(commentCountLabel(2)).toBe("2 comments");
-  });
-});
-
-describe("expandable comment conversations", () => {
-  it("uses a compact single-line preview while preserving meaningful content", () => {
-    expect(commentPreview("  first line\n\nsecond   line  ")).toBe("first line second line");
-  });
-
-  it("keeps the first comment and every reply in conversation order", () => {
-    const messages = buildThreadMessages(thread({
-      comments: [
-        {
-          id: "comment-1",
-          author: { id: "insung", name: "insung" },
-          createdAt: "2026-09-01T00:00:00.000Z",
-          body: "initial comment"
-        },
-        {
-          id: "comment-2",
-          author: { id: "codex", name: "Codex" },
-          createdAt: "2026-09-01T01:00:00.000Z",
-          body: "full reply content"
-        }
-      ]
-    }));
-
-    expect(messages.map((message) => ({
-      kind: message.kind,
-      author: message.comment.author.name,
-      preview: message.preview
-    }))).toEqual([
-      { kind: "comment", author: "insung", preview: "initial comment" },
-      { kind: "reply", author: "Codex", preview: "full reply content" }
-    ]);
   });
 });
 

@@ -58,24 +58,6 @@ export function commentCountLabel(count: number): string {
   return `${count} comment${count === 1 ? "" : "s"}`;
 }
 
-export interface ThreadMessage {
-  kind: "comment" | "reply";
-  comment: ThreadState["comments"][number];
-  preview: string;
-}
-
-export function commentPreview(body: string): string {
-  return body.replace(/\s+/g, " ").trim();
-}
-
-export function buildThreadMessages(thread: ThreadState): ThreadMessage[] {
-  return thread.comments.map((comment, index) => ({
-    kind: index === 0 ? "comment" : "reply",
-    comment,
-    preview: commentPreview(comment.body)
-  }));
-}
-
 export function buildDocumentGroups(entries: readonly WorkspaceThreadEntry[], showResolved = true): DocumentGroup[] {
   const groups = new Map<string, DocumentGroup>();
   for (const entry of entries.filter(({ thread }) => showResolved || thread.status !== "resolved")) {

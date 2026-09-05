@@ -44,6 +44,7 @@ describe("CommentService", () => {
       body: "first"
     });
     const replied = await service.reply(created.id, "second");
+    await service.editComment(created.id, replied.comments[1]!.id, "edited second");
     await service.resolve(created.id);
     await service.reopen(created.id);
     await service.relocateDocument("docs/a.md", "docs/moved.md");
@@ -53,7 +54,7 @@ describe("CommentService", () => {
     expect(state.status).toBe("open");
     expect(state.documentPath).toBe("docs/moved.md");
     expect(state.comments.map((comment) => comment.body)).toEqual(["first"]);
-    expect(state.revision).toBe(5);
+    expect(state.revision).toBe(6);
     expect(state.deleted).toBe(false);
   });
 
@@ -68,5 +69,21 @@ describe("CommentService", () => {
       anchor: { exact: "a", prefix: "", suffix: "", position: 0 },
       body: "   "
     })).rejects.toThrow(/blank/i);
+  });
+
+  it("rejects edits for comments that do not exist", async () => {
+    const repository = new MemoryRepository();
+    const service = new CommentService(repository, {
+      actor: () => ({ id: "user", name: "User" }),
+      id: () => crypto.randomUUID(),
+      now: () => "2026-09-01T00:00:00.000Z"
+    });
+    const thread = await service.create({
+      documentPath: "a.md",
+      anchor: { exact: "a", prefix: "", suffix: "", position: 0 },
+      body: "first"
+    });
+
+    await expect(service.editComment(thread.id, "missing", "edited")).rejects.toThrow(/not found/i);
   });
 });

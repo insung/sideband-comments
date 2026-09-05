@@ -76,6 +76,19 @@ export class CommentService {
     return this.get(threadId);
   }
 
+  async editComment(threadId: string, commentId: string, body: string): Promise<ThreadState> {
+    const current = await this.get(threadId);
+    if (!current.comments.some((comment) => comment.id === commentId)) {
+      throw new Error(`comment not found: ${commentId}`);
+    }
+    await this.repository.append(createEventFactory.commentEdited({
+      ...this.eventBase(threadId, await this.revision(threadId)),
+      commentId,
+      body: this.body(body)
+    }));
+    return this.get(threadId);
+  }
+
   async deleteComment(threadId: string, commentId: string): Promise<ThreadState> {
     const current = await this.get(threadId);
     if (!current.comments.some((comment) => comment.id === commentId)) {

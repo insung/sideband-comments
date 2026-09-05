@@ -2,7 +2,7 @@
   "name": "sideband-comments-vscode",
   "displayName": "Sideband Comments",
   "description": "Shared sidecar comment threads for VS Code and Obsidian.",
-  "version": "0.1.14",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "publisher": "insung",
@@ -31,7 +31,7 @@
       { "command": "sidebandComments.reload", "title": "Sideband Comments: Reload", "icon": "$(refresh)" }
     ],
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         { "id": "sideband-comments-overview", "title": "Sideband Comments", "icon": "$(comment-discussion)" }
       ]
     },
@@ -39,9 +39,16 @@
       "sideband-comments-overview": [
         {
           "id": "sidebandComments.overviewView",
-          "name": "Sideband Comments",
+          "name": "Comments Explorer",
           "contextualTitle": "Sideband Comments",
           "icon": "$(comment-discussion)"
+        },
+        {
+          "id": "sidebandComments.detailView",
+          "name": "Comment Details",
+          "contextualTitle": "Sideband Comments",
+          "type": "webview",
+          "visibility": "visible"
         }
       ]
     },
@@ -65,9 +72,9 @@
         { "command": "sidebandComments.add", "when": "editorHasSelection", "group": "z_commands@100" }
       ],
       "view/title": [
-        { "command": "sidebandComments.showResolved", "when": "(view == sidebandComments.overviewView || view == workbench.panel.comments) && !sidebandComments.showResolved", "group": "navigation@1" },
-        { "command": "sidebandComments.hideResolved", "when": "(view == sidebandComments.overviewView || view == workbench.panel.comments) && sidebandComments.showResolved", "group": "navigation@1" },
-        { "command": "sidebandComments.reload", "when": "view == sidebandComments.overviewView || view == workbench.panel.comments", "group": "navigation@2" }
+        { "command": "sidebandComments.showResolved", "when": "(view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments) && !sidebandComments.showResolved", "group": "navigation@1" },
+        { "command": "sidebandComments.hideResolved", "when": "(view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments) && sidebandComments.showResolved", "group": "navigation@1" },
+        { "command": "sidebandComments.reload", "when": "view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments", "group": "navigation@2" }
       ],
       "comments/commentThread/title": [
         { "command": "sidebandComments.resolve", "when": "commentThread == sideband.open", "group": "inline@1" },
@@ -85,7 +92,8 @@
   },
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
-    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.1.14.vsix"
+    "prepackage": "node ../../scripts/check-app-version-line.mjs",
+    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.2.0.vsix"
   },
   "dependencies": {
     "@sideband-comments/core": "0.1.0",

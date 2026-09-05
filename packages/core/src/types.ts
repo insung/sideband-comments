@@ -47,6 +47,12 @@ export interface CommentRepliedEvent extends EventBase {
   body: string;
 }
 
+export interface CommentEditedEvent extends EventBase {
+  type: "comment.edited";
+  commentId: string;
+  body: string;
+}
+
 export interface CommentDeletedEvent extends EventBase {
   type: "comment.deleted";
   commentId: string;
@@ -90,6 +96,7 @@ export interface SuggestionDeclinedEvent extends EventBase {
 export type ThreadEvent =
   | ThreadCreatedEvent
   | CommentRepliedEvent
+  | CommentEditedEvent
   | CommentDeletedEvent
   | ThreadResolvedEvent
   | ThreadReopenedEvent

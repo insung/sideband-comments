@@ -22,6 +22,10 @@ export const createEventFactory = {
   replied(input: BaseInput & { body: string }): ThreadEvent {
     return { ...base(input), type: "comment.replied", body: input.body };
   },
+  commentEdited(input: BaseInput & { commentId: string; body: string }): ThreadEvent {
+    if (!input.commentId) throw new Error("comment id is required");
+    return { ...base(input), type: "comment.edited", commentId: input.commentId, body: input.body };
+  },
   commentDeleted(input: BaseInput & { commentId: string }): ThreadEvent {
     if (!input.commentId) throw new Error("comment id is required");
     return { ...base(input), type: "comment.deleted", commentId: input.commentId };

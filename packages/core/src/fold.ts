@@ -41,6 +41,11 @@ export function foldThread(input: readonly ThreadEvent[]): ThreadState {
       case "comment.replied":
         state.comments.push({ id: event.eventId, author: event.actor, createdAt: event.occurredAt, body: event.body });
         break;
+      case "comment.edited": {
+        const comment = state.comments.find((candidate) => candidate.id === event.commentId);
+        if (comment) comment.body = event.body;
+        break;
+      }
       case "comment.deleted":
         deletedCommentIds.add(event.commentId);
         break;

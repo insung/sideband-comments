@@ -13,9 +13,12 @@
     "apps/*"
   ],
   "scripts": {
+    "check:app-versions": "node scripts/check-app-version-line.mjs",
+    "pretest": "node scripts/check-app-version-line.test.mjs && npm run check:app-versions",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b",
+    "prebuild": "npm run check:app-versions",
     "build": "npm run typecheck && npm run build --workspaces --if-present",
     "clean": "tsc -b --clean"
   },

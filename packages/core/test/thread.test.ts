@@ -30,11 +30,20 @@ describe("thread event fold", () => {
         actor,
         body: "확인했어"
       }),
-      createEventFactory.resolved({ eventId: "e2", threadId: "t1", revision: 2, occurredAt: at, actor }),
+      createEventFactory.commentEdited({
+        eventId: "e1-edit",
+        threadId: "t1",
+        revision: 2,
+        occurredAt: at,
+        actor,
+        commentId: "e1",
+        body: "수정한 답글"
+      }),
+      createEventFactory.resolved({ eventId: "e2", threadId: "t1", revision: 3, occurredAt: at, actor }),
       createEventFactory.relocated({
         eventId: "e3",
         threadId: "t1",
-        revision: 3,
+        revision: 4,
         occurredAt: at,
         actor,
         documentPath: "docs/new.md"
@@ -42,12 +51,12 @@ describe("thread event fold", () => {
       createEventFactory.reanchored({
         eventId: "e4",
         threadId: "t1",
-        revision: 4,
+        revision: 5,
         occurredAt: at,
         actor,
         anchor: { exact: "new", prefix: "", suffix: "", position: 5 }
       }),
-      createEventFactory.deleted({ eventId: "e5", threadId: "t1", revision: 5, occurredAt: at, actor })
+      createEventFactory.deleted({ eventId: "e5", threadId: "t1", revision: 6, occurredAt: at, actor })
     ];
 
     const thread = foldThread(events);
@@ -55,7 +64,7 @@ describe("thread event fold", () => {
     expect(thread.documentPath).toBe("docs/new.md");
     expect(thread.originalAnchor.exact).toBe("old");
     expect(thread.anchor.exact).toBe("new");
-    expect(thread.comments.map((comment) => comment.body)).toEqual(["검토해줘", "확인했어"]);
+    expect(thread.comments.map((comment) => comment.body)).toEqual(["검토해줘", "수정한 답글"]);
     expect(thread.deleted).toBe(true);
   });
 

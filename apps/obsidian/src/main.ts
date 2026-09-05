@@ -76,6 +76,9 @@ export default class SidebandCommentsPlugin extends Plugin {
     this.watcher = watch(this.repository.threadsDirectory, () => this.scheduleRefresh());
     this.register(() => this.watcher?.close());
     this.registerEditorExtension(sidebandHighlightField);
+    this.registerEditorExtension(EditorView.updateListener.of((update) => {
+      if (update.selectionSet) queueMicrotask(() => this.refreshSelectionPreview());
+    }));
     this.registerView(SIDEBAND_VIEW_TYPE, (leaf) => new SidebandSidebarView(leaf, this));
     this.addSettingTab(new SidebandSettingTab(this.app, this));
     this.addRibbonIcon("messages-square", "Sideband Comments", () => void this.openSidebar());
@@ -111,6 +114,12 @@ export default class SidebandCommentsPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  async setShowResolved(value: boolean): Promise<void> {
+    this.settings.showResolved = value;
+    await this.saveSettings();
+    await this.refresh();
   }
 
   private actor(): Actor {
@@ -149,6 +158,20 @@ export default class SidebandCommentsPlugin extends Plugin {
     return this.app.workspace.getActiveFile()?.path;
   }
 
+  selectionFor(documentPath: string): string {
+    return this.markdownView(documentPath)?.editor.getSelection() ?? "";
+  }
+
+  private refreshSelectionPreview(): void {
+    const view = this.markdownView();
+    if (!view?.file) return;
+    const selection = view.editor.getSelection();
+    for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAND_VIEW_TYPE)) {
+      const sidebar = leaf.view;
+      if (sidebar instanceof SidebandSidebarView) sidebar.updateSelectionPreview(view.file.path, selection);
+    }
+  }
+
   private markdownView(path?: string): MarkdownView | undefined {
     const active = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (active?.file && (!path || active.file.path === path)) return active;
@@ -162,24 +185,42 @@ export default class SidebandCommentsPlugin extends Plugin {
   async addCommentFromSelection(): Promise<void> {
     const view = this.markdownView();
     if (!view?.file) return;
-    const selection = view.editor.getSelection();
-    if (!selection) {
+    if (!view.editor.getSelection()) {
       new Notice("Select text before adding a comment.");
       return;
     }
     const body = await this.prompt("New comment");
     if (!body) return;
-    const markdown = view.editor.getValue();
-    const from = view.editor.posToOffset(view.editor.getCursor("from"));
-    const to = view.editor.posToOffset(view.editor.getCursor("to"));
-    await this.service.create({ documentPath: view.file.path, anchor: captureAnchor(markdown, from, to), body });
-    await this.openSidebar();
-    await this.refresh();
+    await this.createCommentFromSelection(view.file.path, body);
   }
 
-  async reanchorFromSelection(threadId: string): Promise<boolean> {
-    const view = this.markdownView();
-    if (!view?.file || !view.editor.getSelection()) return false;
+  async createCommentFromSelection(documentPath: string, body: string): Promise<boolean> {
+    const view = this.markdownView(documentPath);
+    if (!view?.file || !view.editor.getSelection()) {
+      new Notice("Select text in this note before adding a comment.");
+      return false;
+    }
+    const markdown = view.editor.getValue();
+    await this.service.create({
+      documentPath: view.file.path,
+      anchor: captureAnchor(
+        markdown,
+        view.editor.posToOffset(view.editor.getCursor("from")),
+        view.editor.posToOffset(view.editor.getCursor("to"))
+      ),
+      body
+    });
+    await this.openSidebar();
+    await this.refresh();
+    return true;
+  }
+
+  async reanchorFromSelection(documentPath: string, threadId: string): Promise<boolean> {
+    const view = this.markdownView(documentPath);
+    if (!view?.file || !view.editor.getSelection()) {
+      new Notice("Select the new anchor text in this note before re-anchoring.");
+      return false;
+    }
     const markdown = view.editor.getValue();
     await this.service.reanchor(threadId, captureAnchor(
       markdown,
@@ -207,13 +248,8 @@ export default class SidebandCommentsPlugin extends Plugin {
   }
 
   async openThread(documentPath: string, threadId: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(documentPath);
-    if (!(file instanceof TFile)) {
-      new Notice(`Cannot open comment file: ${documentPath}`);
-      return;
-    }
-    const leaf = this.app.workspace.getLeaf(false);
-    await leaf.openFile(file);
+    const leaf = await this.openDocument(documentPath);
+    if (!leaf) return;
     const view = leaf.view instanceof MarkdownView ? leaf.view : this.markdownView(documentPath);
     if (!view) return;
     const model = (await this.modelsFor(documentPath, view.editor.getValue())).find((candidate) => candidate.id === threadId);
@@ -223,6 +259,17 @@ export default class SidebandCommentsPlugin extends Plugin {
     view.editor.setSelection(from, to);
     view.editor.scrollIntoView({ from, to }, true);
     view.editor.focus();
+  }
+
+  async openDocument(documentPath: string) {
+    const file = this.app.vault.getAbstractFileByPath(documentPath);
+    if (!(file instanceof TFile)) {
+      new Notice(`Cannot open comment file: ${documentPath}`);
+      return undefined;
+    }
+    const leaf = this.app.workspace.getLeaf(false);
+    await leaf.openFile(file);
+    return leaf;
   }
 
   private async openSidebar(): Promise<void> {

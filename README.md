@@ -2,7 +2,7 @@
 
 Sideband Comments keeps anchored review threads outside source documents and shows the same comments in VS Code and Obsidian.
 
-Markdown and source files remain unchanged when a comment is created, replied to, resolved, or re-anchored. Both editor extensions share one append-only store:
+Markdown and source files remain unchanged when a comment is created, replied to, edited, deleted, resolved, or re-anchored. Both editor extensions share one append-only store:
 
 ```text
 .comments/
@@ -24,7 +24,7 @@ apps/vscode/            VS Code CommentController adapter
 apps/obsidian/          Obsidian sidebar and Live Preview adapter
 ```
 
-The core owns thread events, deterministic folding, quote anchors, resolve/reopen, re-anchor, and file relocation. Editor packages only translate host API events into core use cases.
+The core owns thread events, deterministic folding, quote anchors, edit/delete history, resolve/reopen, re-anchor, and file relocation. Editor packages only translate host API events into core use cases. VS Code and Obsidian both present a workspace-wide file explorer above a selected-file detail editor, including re-anchor and show/hide-resolved controls.
 
 ## Development
 
@@ -37,17 +37,29 @@ npm run typecheck
 npm run build
 ```
 
+## App version policy
+
+VS Code and Obsidian releases may increment their patch versions independently, but they must share the same `major.minor` line. For example, VS Code `0.2.3` and Obsidian `0.2.7` are valid; `0.3.x` and `0.2.x` are not. Obsidian's package and manifest versions must match exactly.
+
+`npm test`, the root build, each app package command, and the `App version policy` GitHub Actions check run the same validation:
+
+```bash
+npm run check:app-versions
+```
+
+Require the `app-version-policy` status check in the default branch protection rules to prevent mismatched version lines from being merged.
+
 ### VS Code package
 
 ```bash
 npm run package --workspace sideband-comments-vscode
-code --install-extension apps/vscode/dist/sideband-comments-vscode-0.1.14.vsix --force
+code --install-extension apps/vscode/dist/sideband-comments-vscode-0.2.0.vsix --force
 ```
 
 ### Obsidian package
 
 ```bash
-npm run build --workspace sideband-comments-obsidian
+npm run package --workspace sideband-comments-obsidian
 ```
 
 Copy these files from `apps/obsidian/dist/` to `<vault>/.obsidian/plugins/sideband-comments/`:
@@ -56,7 +68,7 @@ Copy these files from `apps/obsidian/dist/` to `<vault>/.obsidian/plugins/sideba
 - `manifest.json`
 - `styles.css`
 
-The initial Obsidian adapter is desktop-only. It provides Live Preview highlights and a sidebar; Reading View range mapping is not included yet.
+The Obsidian adapter is desktop-only. It provides Live Preview highlights plus a two-part sidebar: a directory-tree comment explorer above the selected note's inline comment, reply, edit, delete, resolve, re-anchor, and resolved-visibility controls. The new-comment composer previews the current editor selection, and existing comment bodies open inline editing on double-click. Reading View range mapping is not included yet.
 
 ## Migrating Tandem Comments
 
