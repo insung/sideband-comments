@@ -46,6 +46,10 @@ export function activate(context: vscode.ExtensionContext): void {
     await comments.submit(reply);
     tree.refresh();
   });
+  register("sidebandComments.reply", async (reply: vscode.CommentReply) => {
+    await comments.submit(reply);
+    tree.refresh();
+  });
   register("sidebandComments.resolve", async (thread: vscode.CommentThread) => {
     await comments.setStatus(thread, "resolved");
     tree.refresh();

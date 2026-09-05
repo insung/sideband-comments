@@ -17,15 +17,32 @@ const manifest = JSON.parse(
 describe("VS Code contributions", () => {
   it("puts the Sideband Comments overview in the Primary Side Bar", () => {
     expect(manifest.contributes.viewsContainers?.activitybar).toContainEqual(
-      expect.objectContaining({ id: "sidebandComments.overview", title: "Sideband Comments" })
+      expect.objectContaining({ id: "sideband-comments-overview", title: "Sideband Comments" })
     );
-    expect(manifest.contributes.views?.["sidebandComments.overview"]).toContainEqual(
+    expect(manifest.contributes.views?.["sideband-comments-overview"]).toContainEqual(
       expect.objectContaining({
         id: "sidebandComments.overviewView",
         name: "Sideband Comments",
         contextualTitle: "Sideband Comments"
       })
     );
+  });
+
+  it("separates new comments from replies for the Sideband controller", () => {
+    expect(manifest.contributes.commands).toEqual(expect.arrayContaining([
+      expect.objectContaining({ command: "sidebandComments.create", title: "Comment" }),
+      expect.objectContaining({ command: "sidebandComments.reply", title: "Reply" })
+    ]));
+    expect(manifest.contributes.menus["comments/commentThread/context"]).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        command: "sidebandComments.create",
+        when: "commentController == sidebandComments && commentThreadIsEmpty"
+      }),
+      expect.objectContaining({
+        command: "sidebandComments.reply",
+        when: "commentController == sidebandComments && !commentThreadIsEmpty"
+      })
+    ]));
   });
 
   it("places Add Comment near the bottom of the editor context menu", () => {
