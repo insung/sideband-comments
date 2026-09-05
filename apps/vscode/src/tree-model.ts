@@ -86,3 +86,59 @@ export function buildDocumentGroups(entries: readonly WorkspaceThreadEntry[], sh
       left.documentPath.localeCompare(right.documentPath)
     );
 }
+
+export type CommentTreeNode = {
+  kind: "document";
+  id: string;
+  name: string;
+  group: DocumentGroup;
+} | {
+  kind: "workspace" | "directory";
+  id: string;
+  name: string;
+  workspaceKey: string;
+  path: string;
+  threadCount: number;
+  children: CommentTreeNode[];
+};
+
+export function buildDocumentTree(groups: readonly DocumentGroup[]): CommentTreeNode[] {
+  const roots = new Map<string, Extract<CommentTreeNode, { children: CommentTreeNode[] }>>();
+  for (const group of groups) {
+    let root = roots.get(group.workspaceKey);
+    if (!root) {
+      root = {
+        kind: "workspace", id: JSON.stringify([group.workspaceKey, "workspace"]),
+        name: group.workspaceName, workspaceKey: group.workspaceKey, path: "", threadCount: 0, children: []
+      };
+      roots.set(group.workspaceKey, root);
+    }
+    root.threadCount += group.threads.length;
+    let parent = root;
+    const parts = group.documentPath.split("/");
+    for (let index = 0; index < parts.length - 1; index++) {
+      const path = parts.slice(0, index + 1).join("/");
+      let directory = parent.children.find((node) => node.kind === "directory" && node.path === path);
+      if (!directory || directory.kind === "document") {
+        directory = {
+          kind: "directory", id: JSON.stringify([group.workspaceKey, "directory", path]),
+          name: parts[index]!, workspaceKey: group.workspaceKey, path, threadCount: 0, children: []
+        };
+        parent.children.push(directory);
+      }
+      directory.threadCount += group.threads.length;
+      parent = directory;
+    }
+    parent.children.push({
+      kind: "document", id: JSON.stringify([group.workspaceKey, "document", group.documentPath]),
+      name: parts.at(-1)!, group
+    });
+  }
+  const sort = (nodes: CommentTreeNode[]): CommentTreeNode[] => {
+    nodes.sort((a, b) => Number(a.kind === "document") - Number(b.kind === "document")
+      || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    for (const node of nodes) if (node.kind !== "document") sort(node.children);
+    return nodes;
+  };
+  return sort([...roots.values()]);
+}

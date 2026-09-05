@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { captureAnchor, resolveAnchor, type ThreadState } from "@sideband-comments/core";
 import { nonEmptyAnchorOffsets, singleLineDisplayOffsets } from "./comment-anchor.js";
 import { commentBodyWithOriginalText } from "./comment-display.js";
-import { commentRenderSignature, KeyedSingleFlight, planActiveDocumentSync } from "./comment-lifecycle.js";
+import { KeyedSingleFlight, planActiveDocumentSync } from "./comment-lifecycle.js";
 import type { WorkspaceComments } from "./workspace.js";
 
 class SidebandComment implements vscode.Comment {
@@ -22,19 +22,22 @@ class SidebandComment implements vscode.Comment {
 interface ThreadMetadata {
   id: string;
   status: ThreadState["status"];
+  commentsSignature?: string;
 }
 
 export class SidebandCommentController implements vscode.Disposable {
   readonly controller = vscode.comments.createCommentController("sidebandComments", "Sideband Comments");
   private readonly metadata = new Map<vscode.CommentThread, ThreadMetadata>();
   private readonly commentMetadata = new WeakMap<vscode.Comment, { threadId: string; commentId: string; uri: vscode.Uri }>();
-  private readonly byDocument = new Map<string, vscode.CommentThread[]>();
-  private readonly renderSignatures = new Map<string, string>();
+  private readonly byDocument = new Map<string, Map<string, vscode.CommentThread>>();
+  private activeKey: string | null | undefined;
+  private readonly submissions = new Map<vscode.CommentThread, Promise<void>>();
   private readonly loads = new KeyedSingleFlight();
   private readonly disposables: vscode.Disposable[] = [];
   private disposed = false;
 
-  constructor(private readonly workspaceFor: (uri: vscode.Uri) => WorkspaceComments | undefined) {
+  constructor(private readonly workspaceFor: (uri: vscode.Uri) => WorkspaceComments | undefined,
+    private readonly log: (message: string) => void = () => {}) {
     this.controller.commentingRangeProvider = {
       provideCommentingRanges: (document) => {
         if (!this.workspaceFor(document.uri)) return [];
@@ -44,9 +47,10 @@ export class SidebandCommentController implements vscode.Disposable {
     this.controller.options = { placeHolder: "Write a Sideband comment…", prompt: "Add Sideband Comment" };
     this.disposables.push(
       this.controller,
-      vscode.window.onDidChangeActiveTextEditor((editor) => void this.syncActive(editor))
+      vscode.window.onDidChangeActiveTextEditor((editor) => void this.syncActive(editor).catch(error => this.log(`active editor error=${error}`)))
     );
-    void this.syncActive(vscode.window.activeTextEditor);
+    this.log("reload reason=activation");
+    void this.syncActive(vscode.window.activeTextEditor).catch(error => this.log(`activation error=${error}`));
   }
 
   dispose(): void {
@@ -60,15 +64,17 @@ export class SidebandCommentController implements vscode.Disposable {
   }
 
   private clearKey(key: string): void {
-    for (const thread of this.byDocument.get(key) ?? []) {
+    for (const thread of this.byDocument.get(key)?.values() ?? []) {
       this.metadata.delete(thread);
       thread.dispose();
     }
+    this.log(`threads uri=${key} disposed=${this.byDocument.get(key)?.size ?? 0} reason=unload`);
     this.byDocument.delete(key);
-    this.renderSignatures.delete(key);
   }
 
   async syncActive(editor: vscode.TextEditor | undefined): Promise<void> {
+    // Native comment inputs are text editors too. Focusing one is not a file switch.
+    if (editor?.document.uri.scheme === "comment") return;
     const documents = new Map<string, vscode.TextDocument>();
     const activeKey = editor
       ? (this.workspaceFor(editor.document.uri) ? editor.document.uri.toString() : null)
@@ -76,6 +82,7 @@ export class SidebandCommentController implements vscode.Disposable {
     if (editor && activeKey) {
       documents.set(editor.document.uri.toString(), editor.document);
     }
+    if (activeKey !== undefined) this.activeKey = activeKey;
     const plan = planActiveDocumentSync(
       activeKey,
       [...this.byDocument.keys()],
@@ -85,14 +92,18 @@ export class SidebandCommentController implements vscode.Disposable {
     await Promise.all(plan.load.map((key) => this.load(documents.get(key)!)));
   }
 
-  async reloadActive(): Promise<void> {
+  async reloadActive(reason = "explicit refresh"): Promise<void> {
+    this.log(`reload reason=${reason}`);
     await this.syncActive(vscode.window.activeTextEditor);
-    const document = vscode.window.activeTextEditor?.document;
-    if (document && this.workspaceFor(document.uri)) await this.load(document);
+    const active = vscode.window.activeTextEditor?.document;
+    const document = active && this.workspaceFor(active.uri) ? active
+      : vscode.workspace.textDocuments.find(document => document.uri.toString() === this.activeKey);
+    if (document && this.workspaceFor(document.uri)) await this.load(document, reason);
   }
 
-  async load(document: vscode.TextDocument): Promise<void> {
+  async load(document: vscode.TextDocument, reason = "active editor change"): Promise<void> {
     const key = document.uri.toString();
+    this.log(`load reason=${reason} uri=${key}`);
     return this.loads.run(key, () => this.loadNow(document));
   }
 
@@ -101,12 +112,11 @@ export class SidebandCommentController implements vscode.Disposable {
     if (!workspace || this.disposed) return;
     const showResolved = vscode.workspace.getConfiguration("sidebandComments").get("showResolved", true);
     const states = await workspace.repository.listByDocument(workspace.relativePath(document.uri));
-    if (this.disposed) return;
     const key = document.uri.toString();
-    const signature = commentRenderSignature(document.version, showResolved, states);
-    if (this.renderSignatures.get(key) === signature) return;
-    this.clearKey(key);
-    const threads: vscode.CommentThread[] = [];
+    if (this.disposed || (this.activeKey !== undefined && this.activeKey !== key)) return;
+    const threads = this.byDocument.get(key) ?? new Map<string, vscode.CommentThread>();
+    const retained = new Set<string>();
+    let created = 0, updated = 0, reused = 0, disposed = 0;
     for (const state of states) {
       if (state.status === "resolved" && !showResolved) continue;
       const resolution = resolveAnchor(document.getText(), state.anchor);
@@ -116,29 +126,49 @@ export class SidebandCommentController implements vscode.Disposable {
       const range = display
         ? new vscode.Range(document.positionAt(display.start), document.positionAt(display.end))
         : new vscode.Range(0, 0, 0, 0);
-      const thread = this.controller.createCommentThread(document.uri, range, []);
-      const comments = state.comments.map((comment, index) => new SidebandComment(
-        comment.id,
-        comment,
-        index === 0 ? state.originalAnchor.exact : undefined
-      ));
-      for (const comment of comments) {
-        this.commentMetadata.set(comment, { threadId: state.id, commentId: comment.id, uri: document.uri });
+      retained.add(state.id);
+      let thread = threads.get(state.id);
+      if (!thread) {
+        thread = this.controller.createCommentThread(document.uri, range, []);
+        thread.canReply = true;
+        thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
+        threads.set(state.id, thread);
+        created++;
+      } else {
+        reused++;
       }
-      thread.comments = comments;
-      thread.canReply = true;
-      thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
-      thread.contextValue = resolution.kind === "resolved" ? `sideband.${state.status}` : "sideband.orphaned";
-      if (resolution.kind !== "resolved") thread.label = `⚠ ${resolution.kind}`;
-      else if (state.status === "resolved") thread.label = "✓ resolved";
-      thread.state = state.status === "resolved" && !showResolved
-        ? vscode.CommentThreadState.Resolved
-        : vscode.CommentThreadState.Unresolved;
-      this.metadata.set(thread, { id: state.id, status: state.status });
-      threads.push(thread);
+      const commentsSignature = JSON.stringify([state.originalAnchor.exact, state.comments]);
+      let changed = false;
+      if (this.metadata.get(thread)?.commentsSignature !== commentsSignature) {
+        const comments = state.comments.map((comment, index) => new SidebandComment(
+          comment.id, comment, index === 0 ? state.originalAnchor.exact : undefined
+        ));
+        for (const comment of comments) {
+          this.commentMetadata.set(comment, { threadId: state.id, commentId: comment.id, uri: document.uri });
+        }
+        thread.comments = comments;
+        changed = true;
+      }
+      if (!thread.range?.isEqual(range)) { thread.range = range; changed = true; }
+      const contextValue = resolution.kind === "resolved" ? `sideband.${state.status}` : "sideband.orphaned";
+      const label = resolution.kind !== "resolved" ? `⚠ ${resolution.kind}` : state.status === "resolved" ? "✓ resolved" : "";
+      // The extension's resolved filter owns visibility, including in VS Code's Comments view.
+      const nativeState = vscode.CommentThreadState.Unresolved;
+      if (thread.contextValue !== contextValue) { thread.contextValue = contextValue; changed = true; }
+      if (thread.label !== label) { thread.label = label; changed = true; }
+      if (thread.state !== nativeState) { thread.state = nativeState; changed = true; }
+      this.metadata.set(thread, { id: state.id, status: state.status, commentsSignature });
+      if (changed) updated++;
+    }
+    for (const [id, thread] of threads) {
+      if (retained.has(id)) continue;
+      this.metadata.delete(thread);
+      thread.dispose();
+      threads.delete(id);
+      disposed++;
     }
     this.byDocument.set(key, threads);
-    this.renderSignatures.set(key, signature);
+    this.log(`threads uri=${key} created=${created} reused=${reused} updated=${updated} disposed=${disposed}`);
   }
 
   async addOnSelection(editor: vscode.TextEditor): Promise<boolean> {
@@ -174,7 +204,16 @@ export class SidebandCommentController implements vscode.Disposable {
     return true;
   }
 
-  async submit(reply: vscode.CommentReply): Promise<void> {
+  submit(reply: vscode.CommentReply): Promise<void> {
+    if (!reply?.thread || typeof reply.text !== "string") return Promise.reject(new Error("A comment reply is required."));
+    const pending = this.submissions.get(reply.thread);
+    if (pending) return pending;
+    const operation = this.submitNow(reply).finally(() => this.submissions.delete(reply.thread));
+    this.submissions.set(reply.thread, operation);
+    return operation;
+  }
+
+  private async submitNow(reply: vscode.CommentReply): Promise<void> {
     const workspace = this.workspaceFor(reply.thread.uri);
     const document = vscode.workspace.textDocuments.find((candidate) => candidate.uri.toString() === reply.thread.uri.toString());
     if (!workspace || !document) return;
@@ -190,13 +229,29 @@ export class SidebandCommentController implements vscode.Disposable {
         document.offsetAt(range.end)
       );
       if (!offsets) throw new Error("Select non-empty text or comment on a non-blank line.");
-      await workspace.service.create({
+      const state = await workspace.service.create({
         documentPath: workspace.relativePath(document.uri),
         anchor: captureAnchor(document.getText(), offsets.start, offsets.end),
         body: reply.text
       });
+      // Adopt the native draft instead of replacing the widget after the first write.
+      const key = document.uri.toString();
+      if (this.disposed || (this.activeKey !== undefined && this.activeKey !== key)) {
+        reply.thread.dispose();
+      } else {
+        this.metadata.set(reply.thread, { id: state.id, status: state.status });
+        const threads = this.byDocument.get(key) ?? new Map<string, vscode.CommentThread>();
+        const duplicate = threads.get(state.id);
+        if (duplicate && duplicate !== reply.thread) {
+          this.metadata.delete(duplicate);
+          duplicate.dispose();
+        }
+        threads.set(state.id, reply.thread);
+        this.byDocument.set(key, threads);
+      }
     }
-    await this.load(document);
+    this.log(`submit uri=${document.uri.toString()} saved=1`);
+    await this.load(document, "native write");
   }
 
   async setStatus(thread: vscode.CommentThread, status: "open" | "resolved"): Promise<void> {

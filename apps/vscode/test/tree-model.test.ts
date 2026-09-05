@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ThreadState } from "@sideband-comments/core";
 import {
   buildDocumentGroups,
+  buildDocumentTree,
   collectWorkspaceThreads,
   commentCountLabel
 } from "../src/tree-model.js";
@@ -84,5 +85,43 @@ describe("collectWorkspaceThreads", () => {
 
     expect(result.entries.map((entry) => entry.thread.id)).toEqual(["visible"]);
     expect(result.failures).toEqual([{ workspaceName: "bad-repo", message: "invalid event" }]);
+  });
+});
+
+describe("buildDocumentTree", () => {
+  it("nests directories before files and keeps same-named repositories separate", () => {
+    const entries = [
+      { workspaceKey: "file:///one", workspaceName: "repo", thread: thread({ documentPath: "README.md" }) },
+      { workspaceKey: "file:///one", workspaceName: "repo", thread: thread({ id: "nested", documentPath: "src/lib/example.ts" }) },
+      { workspaceKey: "file:///two", workspaceName: "repo", thread: thread({ id: "other", documentPath: "src/lib/example.ts" }) }
+    ];
+    const tree = buildDocumentTree(buildDocumentGroups(entries));
+    expect(tree).toHaveLength(2);
+    expect(tree[0]?.id).not.toBe(tree[1]?.id);
+    const root = tree[0]!;
+    if (root.kind === "document") throw new Error("expected repository");
+    expect(root.threadCount).toBe(2);
+    expect(root.children.map(node => node.name)).toEqual(["src", "README.md"]);
+    const src = root.children[0]!;
+    if (src.kind === "document") throw new Error("expected directory");
+    const lib = src.children[0]!;
+    if (lib.kind === "document") throw new Error("expected nested directory");
+    expect(lib.children[0]).toMatchObject({ kind: "document", name: "example.ts", group: { documentPath: "src/lib/example.ts" } });
+    expect(buildDocumentTree(buildDocumentGroups([...entries].reverse()))).toEqual(tree);
+  });
+
+  it("removes empty resolved-only branches and preserves surviving node identities", () => {
+    const entries = [
+      { workspaceKey: "a", workspaceName: "alpha", thread: thread({ documentPath: "src/open.ts" }) },
+      { workspaceKey: "a", workspaceName: "alpha", thread: thread({ id: "resolved", documentPath: "done/closed.ts", status: "resolved" }) }
+    ];
+    const all = buildDocumentTree(buildDocumentGroups(entries));
+    const visible = buildDocumentTree(buildDocumentGroups(entries, false));
+    expect(visible[0]?.id).toBe(all[0]?.id);
+    const root = visible[0]!;
+    if (root.kind === "document") throw new Error("expected repository");
+    expect(root.children.map(node => node.name)).toEqual(["src"]);
+    expect(root.threadCount).toBe(1);
+    expect(buildDocumentTree([])).toEqual([]);
   });
 });

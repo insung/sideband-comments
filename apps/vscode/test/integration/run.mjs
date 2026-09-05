@@ -1,0 +1,16 @@
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import { build } from 'esbuild';
+const extension = fileURLToPath(new URL('../../', import.meta.url));
+const root = await mkdtemp(join(tmpdir(), 'sideband-host-'));
+for (const name of ['alpha', 'beta']) await mkdir(join(root, name));
+await writeFile(join(root, 'fixture.code-workspace'), JSON.stringify({folders:[{path:'alpha'},{path:'beta'}], settings:{'security.workspace.trust.enabled':false,'workbench.startupEditor':'none','chat.disableAIFeatures':true}}));
+await build({entryPoints:[fileURLToPath(new URL('host.ts',import.meta.url))],bundle:true,platform:'node',format:'cjs',external:['vscode'],outfile:join(root,'host.cjs')});
+const env = {...process.env, SIDEBAND_HOST_RESULT: join(root,'result.json')};
+delete env.ELECTRON_RUN_AS_NODE;
+const child = spawn(process.env.VSCODE_EXECUTABLE_PATH || '/usr/share/code/code', [join(root,'fixture.code-workspace'), `--extensionDevelopmentPath=${resolve(extension)}`,`--extensionTestsPath=${join(root,'host.cjs')}`,`--user-data-dir=${join(root,'user')}`,`--extensions-dir=${join(root,'extensions')}`,'--disable-workspace-trust','--skip-welcome','--skip-release-notes'],{env,stdio:'inherit'});
+console.log(`Extension Host evidence: ${root}`);
+child.on('exit', code => process.exit(code ?? 1));

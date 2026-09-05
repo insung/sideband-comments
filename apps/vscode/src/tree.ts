@@ -1,26 +1,24 @@
 import * as vscode from "vscode";
 import {
   buildDocumentGroups,
+  buildDocumentTree,
+  type CommentTreeNode,
   collectWorkspaceThreads,
   commentCountLabel,
   type DocumentGroup
 } from "./tree-model.js";
 import type { WorkspaceComments } from "./workspace.js";
 
-interface DocumentNode {
-  kind: "document";
-  group: DocumentGroup;
-}
-
-export class SidebandCommentsView implements vscode.TreeDataProvider<DocumentNode>, vscode.Disposable {
-  private readonly changed = new vscode.EventEmitter<DocumentNode | undefined>();
+export class SidebandCommentsView implements vscode.TreeDataProvider<CommentTreeNode>, vscode.Disposable {
+  private readonly changed = new vscode.EventEmitter<CommentTreeNode | undefined>();
   readonly onDidChangeTreeData = this.changed.event;
-  private readonly tree: vscode.TreeView<DocumentNode>;
+  private readonly tree: vscode.TreeView<CommentTreeNode>;
 
   constructor(
     context: vscode.ExtensionContext,
     private readonly workspaces: () => readonly WorkspaceComments[],
-    private readonly onSelect: (group: DocumentGroup) => void
+    private readonly onSelect: (group: DocumentGroup) => void | Promise<void>,
+    private readonly log: (message: string) => void = () => {}
   ) {
     this.tree = vscode.window.createTreeView("sidebandComments.overviewView", {
       treeDataProvider: this,
@@ -28,10 +26,7 @@ export class SidebandCommentsView implements vscode.TreeDataProvider<DocumentNod
     });
     context.subscriptions.push(
       this.tree,
-      this.tree.onDidChangeSelection(({ selection }) => {
-        const node = selection[0];
-        if (node) this.onSelect(node.group);
-      })
+      vscode.commands.registerCommand("sidebandComments.openDocument", (group: DocumentGroup) => this.onSelect(group))
     );
   }
 
@@ -43,28 +38,43 @@ export class SidebandCommentsView implements vscode.TreeDataProvider<DocumentNod
     this.changed.fire(undefined);
   }
 
-  getTreeItem(node: DocumentNode): vscode.TreeItem {
-    const count = commentCountLabel(node.group.threads.length);
-    const item = new vscode.TreeItem(node.group.documentPath, vscode.TreeItemCollapsibleState.None);
-    item.description = this.workspaces().length > 1 ? `${node.group.workspaceName} · ${count}` : count;
-    item.tooltip = `${node.group.workspaceName}/${node.group.documentPath} · ${count}`;
-    item.iconPath = new vscode.ThemeIcon("file");
-    item.contextValue = "sideband.document";
+  getTreeItem(node: CommentTreeNode): vscode.TreeItem {
+    const isDocument = node.kind === "document";
+    const count = commentCountLabel(isDocument ? node.group.threads.length : node.threadCount);
+    const item = new vscode.TreeItem(node.name, isDocument
+      ? vscode.TreeItemCollapsibleState.None : vscode.TreeItemCollapsibleState.Expanded);
+    item.id = node.id;
+    item.description = count;
+    item.contextValue = `sideband.${node.kind}`;
+    if (node.kind === "document") {
+      item.command = { command: "sidebandComments.openDocument", title: "Open Comment File", arguments: [node.group] };
+      item.tooltip = `${node.group.workspaceName}/${node.group.documentPath} · ${count}`;
+      item.iconPath = new vscode.ThemeIcon("file");
+    } else {
+      item.tooltip = `${node.name} · ${count}`;
+      item.iconPath = new vscode.ThemeIcon(node.kind === "workspace" ? "repo" : "folder");
+    }
     return item;
   }
 
-  async getChildren(node?: DocumentNode): Promise<DocumentNode[]> {
-    if (node) return [];
+  async getChildren(node?: CommentTreeNode): Promise<CommentTreeNode[]> {
+    if (node) return node.kind === "document" ? [] : node.children;
 
     const collection = await collectWorkspaceThreads(this.workspaces().map((workspace) => ({
       workspaceKey: workspace.folder.uri.toString(),
       workspaceName: workspace.folder.name,
-      list: () => workspace.repository.list()
+      list: async () => {
+        const threads = await workspace.repository.list();
+        this.log(`Explorer repository=${workspace.folder.uri.toString()} threads=${threads.length}`);
+        return threads;
+      }
     })));
     this.tree.message = collection.failures.length
       ? `Could not read: ${collection.failures.map((failure) => failure.workspaceName).join(", ")}`
       : "";
     const showResolved = vscode.workspace.getConfiguration("sidebandComments").get("showResolved", true);
-    return buildDocumentGroups(collection.entries, showResolved).map((group) => ({ kind: "document", group }));
+    const groups = buildDocumentGroups(collection.entries, showResolved);
+    this.log(`Explorer getChildren repositories=${this.workspaces().length} files=${groups.length} threads=${collection.entries.length} failures=${JSON.stringify(collection.failures)}`);
+    return buildDocumentTree(groups);
   }
 }

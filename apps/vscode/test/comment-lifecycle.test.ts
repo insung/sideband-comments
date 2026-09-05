@@ -77,3 +77,21 @@ describe("commentRenderSignature", () => {
     expect(commentRenderSignature(3, true, [{ id: "thread-1", comments: [{ body: "changed" }] }])).not.toBe(signature);
   });
 });
+
+
+describe("reloads arriving during a read", () => {
+  it("performs a trailing read instead of losing a watcher event", async () => {
+    let release!: () => void;
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    const flights = new KeyedSingleFlight();
+    const first = vi.fn(async () => { await blocked; });
+    const latest = vi.fn(async () => {});
+    const pending = flights.run("document", first);
+    const joined = flights.run("document", latest);
+    release();
+    await Promise.all([pending, joined]);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(latest).toHaveBeenCalledTimes(1);
+    expect(flights.keys()).toEqual([]);
+  });
+});

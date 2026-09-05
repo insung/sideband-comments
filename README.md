@@ -51,6 +51,8 @@ Require the `app-version-policy` status check in the default branch protection r
 
 ### VS Code package
 
+Comments Explorer groups commented files by workspace and directory. In Comment Details, double-click a comment body to open Save/Cancel editing (or focus it and press Enter). Delete opens a VS Code confirmation dialog; confirming hides the comment while preserving its JSONL history.
+
 ```bash
 npm run package --workspace sideband-comments-vscode
 code --install-extension apps/vscode/dist/sideband-comments-vscode-0.2.0.vsix --force

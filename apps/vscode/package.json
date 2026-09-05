@@ -91,6 +91,7 @@
     }
   },
   "scripts": {
+    "test:integration": "npm run build && node test/integration/run.mjs",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "prepackage": "node ../../scripts/check-app-version-line.mjs",
     "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.2.0.vsix"

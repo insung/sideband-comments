@@ -35,6 +35,7 @@ export function commentRenderSignature(
 }
 
 export class KeyedSingleFlight {
+  private readonly queued = new Map<string, () => Promise<void>>();
   private readonly running = new Map<string, Promise<void>>();
 
   has(key: string): boolean {
@@ -47,9 +48,20 @@ export class KeyedSingleFlight {
 
   run(key: string, task: () => Promise<void>): Promise<void> {
     const current = this.running.get(key);
-    if (current) return current;
+    if (current) {
+      this.queued.set(key, task);
+      return current;
+    }
 
-    const pending = task().finally(() => {
+    const pending = (async () => {
+      let next: (() => Promise<void>) | undefined = task;
+      while (next) {
+        this.queued.delete(key);
+        await next();
+        next = this.queued.get(key);
+      }
+    })().finally(() => {
+      this.queued.delete(key);
       if (this.running.get(key) === pending) this.running.delete(key);
     });
     this.running.set(key, pending);
