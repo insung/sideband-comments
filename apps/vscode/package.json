@@ -1,8 +1,8 @@
 {
   "name": "sideband-comments-vscode",
   "displayName": "Sideband Comments",
-  "description": "Shared sidecar comment threads for VS Code and Obsidian.",
-  "version": "0.2.0",
+  "description": "Document-grounded AI collaboration with shared comments across VS Code and Obsidian.",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "publisher": "insung",
@@ -15,6 +15,17 @@
     "vscode": "^1.106.0"
   },
   "categories": ["Other", "Visualization"],
+  "keywords": ["comments", "review", "ai collaboration", "obsidian", "markdown", "annotations", "sidecar", "jsonl"],
+  "icon": "resources/sideband-comments-icon.png",
+  "galleryBanner": {
+    "color": "#10184f",
+    "theme": "dark"
+  },
+  "pricing": "Free",
+  "homepage": "https://github.com/insung/sideband-comments#readme",
+  "bugs": {
+    "url": "https://github.com/insung/sideband-comments/issues"
+  },
   "main": "./dist/extension.cjs",
   "activationEvents": ["onStartupFinished"],
   "contributes": {
@@ -94,7 +105,7 @@
     "test:integration": "npm run build && node test/integration/run.mjs",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "prepackage": "node ../../scripts/check-app-version-line.mjs",
-    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-0.2.0.vsix"
+    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-1.0.0.vsix"
   },
   "dependencies": {
     "@sideband-comments/core": "0.1.0",
