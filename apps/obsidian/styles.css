@@ -245,3 +245,6 @@
 .sideband-empty {
   color: var(--text-muted);
 }
+.sideband-prompt-input {
+  width: 100%;
+}

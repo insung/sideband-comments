@@ -20,7 +20,7 @@ export class SidebandSettingTab extends PluginSettingTab {
     this.containerEl.empty();
     new Setting(this.containerEl)
       .setName("Author name")
-      .setDesc("Empty uses the operating-system user name.")
+      .setDesc("Optional. Empty uses the neutral name \"user\".")
       .addText((text) => text
         .setValue(this.plugin.settings.authorName)
         .onChange(async (value) => {

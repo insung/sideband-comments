@@ -1,6 +1,5 @@
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import * as os from "node:os";
 import { join } from "node:path";
 import {
   FileSystemAdapter,
@@ -31,9 +30,8 @@ class TextPromptModal extends Modal {
 
   onOpen(): void {
     this.contentEl.createEl("h3", { text: this.label });
-    const input = this.contentEl.createEl("textarea");
+    const input = this.contentEl.createEl("textarea", { cls: "sideband-prompt-input" });
     input.rows = 5;
-    input.style.width = "100%";
     const submit = this.contentEl.createEl("button", { text: "Save" });
     submit.addEventListener("click", () => {
       const value = input.value.trim();
@@ -55,7 +53,7 @@ export default class SidebandCommentsPlugin extends Plugin {
   repository!: JsonlThreadRepository;
   service!: CommentService;
   private watcher?: FSWatcher;
-  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private refreshTimer: number | undefined;
   private root = "";
 
   async onload(): Promise<void> {
@@ -100,13 +98,12 @@ export default class SidebandCommentsPlugin extends Plugin {
   }
 
   onunload(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.app.workspace.detachLeavesOfType(SIDEBAND_VIEW_TYPE);
+    if (this.refreshTimer) window.clearTimeout(this.refreshTimer);
   }
 
   private scheduleRefresh(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => {
+    if (this.refreshTimer) window.clearTimeout(this.refreshTimer);
+    this.refreshTimer = window.setTimeout(() => {
       this.refreshTimer = undefined;
       void this.refresh();
     }, 100);
@@ -123,7 +120,7 @@ export default class SidebandCommentsPlugin extends Plugin {
   }
 
   private actor(): Actor {
-    const name = this.settings.authorName.trim() || os.userInfo().username || "user";
+    const name = this.settings.authorName.trim() || "user";
     return { id: name.toLocaleLowerCase().replace(/[^\p{L}\p{N}_.-]+/gu, "-"), name };
   }
 
@@ -147,8 +144,8 @@ export default class SidebandCommentsPlugin extends Plugin {
       byDocument.set(thread.documentPath, documentThreads);
     }
     const models = await Promise.all([...byDocument.entries()].map(async ([path, documentThreads]) => {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      const markdown = file instanceof TFile ? await this.app.vault.cachedRead(file) : "";
+      const file = this.app.vault.getFileByPath(path);
+      const markdown = file ? await this.app.vault.cachedRead(file) : "";
       return buildThreadViewModels(markdown, documentThreads, this.settings.showResolved);
     }));
     return models.flat();
@@ -262,8 +259,8 @@ export default class SidebandCommentsPlugin extends Plugin {
   }
 
   async openDocument(documentPath: string) {
-    const file = this.app.vault.getAbstractFileByPath(documentPath);
-    if (!(file instanceof TFile)) {
+    const file = this.app.vault.getFileByPath(documentPath);
+    if (!file) {
       new Notice(`Cannot open comment file: ${documentPath}`);
       return undefined;
     }

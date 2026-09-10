@@ -1,0 +1,39 @@
+name: Publish Obsidian release assets
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Check release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: test "$RELEASE_TAG" = "$(node -p \"require('./apps/obsidian/manifest.json').version\")"
+      - run: npm ci
+      - run: npm run package --workspace apps/obsidian
+      - name: Upload Community Plugins assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" apps/obsidian/dist/main.js apps/obsidian/dist/manifest.json apps/obsidian/dist/styles.css --clobber
+      - name: Attest main bundle
+        uses: actions/attest@v4
+        with:
+          subject-path: apps/obsidian/dist/main.js
+      - name: Attest stylesheet
+        uses: actions/attest@v4
+        with:
+          subject-path: apps/obsidian/dist/styles.css

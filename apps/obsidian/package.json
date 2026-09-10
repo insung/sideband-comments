@@ -1,7 +1,7 @@
 {
   "name": "sideband-comments-obsidian",
-  "version": "1.0.0",
-  "description": "Document-grounded AI collaboration with shared comments across Obsidian and VS Code.",
+  "version": "1.0.1",
+  "description": "Document-grounded AI collaboration with shared comments across your notes and VS Code.",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -9,9 +9,11 @@
   "scripts": {
     "build": "esbuild src/main.ts --bundle --platform=node --format=cjs --external:obsidian --external:@codemirror/state --external:@codemirror/view --outfile=dist/main.js && cp manifest.json styles.css dist/",
     "prepackage": "node ../../scripts/check-app-version-line.mjs",
-    "package": "npm run build && zip -j dist/sideband-comments-obsidian-1.0.0.zip dist/main.js dist/manifest.json dist/styles.css"
+    "package": "npm run build && zip -j dist/sideband-comments-obsidian-1.0.1.zip dist/main.js dist/manifest.json dist/styles.css"
   },
   "dependencies": {
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.38.6",
     "@sideband-comments/core": "0.1.0",
     "@sideband-comments/jsonl-store": "0.1.0"
   }
