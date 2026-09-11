@@ -3,6 +3,12 @@ name: Publish Obsidian release assets
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub Release tag to package and publish
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,7 +26,7 @@ jobs:
           cache: npm
       - name: Check release version
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
           manifest_version="$(node -p "require('./apps/obsidian/manifest.json').version")"
           test "$RELEASE_TAG" = "$manifest_version"
@@ -29,7 +35,7 @@ jobs:
       - name: Upload Community Plugins assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: gh release upload "$RELEASE_TAG" apps/obsidian/dist/main.js apps/obsidian/dist/manifest.json apps/obsidian/dist/styles.css --clobber
       - name: Attest main bundle
         uses: actions/attest@v4
