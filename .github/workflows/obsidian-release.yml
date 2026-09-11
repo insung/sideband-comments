@@ -21,7 +21,9 @@ jobs:
       - name: Check release version
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: test "$RELEASE_TAG" = "$(node -p \"require('./apps/obsidian/manifest.json').version\")"
+        run: |
+          manifest_version="$(node -p "require('./apps/obsidian/manifest.json').version")"
+          test "$RELEASE_TAG" = "$manifest_version"
       - run: npm ci
       - run: npm run package --workspace apps/obsidian
       - name: Upload Community Plugins assets
