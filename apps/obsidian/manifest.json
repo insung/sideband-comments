@@ -1,7 +1,7 @@
 {
   "id": "sideband-comments",
   "name": "Sideband Comments",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "minAppVersion": "1.6.0",
   "description": "Document-grounded AI collaboration with shared comments across your notes and VS Code.",
   "author": "insung",
