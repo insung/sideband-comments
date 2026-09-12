@@ -1,15 +1,18 @@
 import { ItemView, MarkdownRenderer, WorkspaceLeaf } from "obsidian";
-import type { DocumentTreeNode, ThreadViewModel } from "./view-model.js";
+import type { DocumentThreadViewModel, DocumentTreeNode, ThreadViewModel } from "./view-model.js";
 import {
   buildDocumentTree,
   groupThreadViewModels,
   resolvedToggleLabel,
   selectionPreviewText,
-  selectDocumentPath
+  selectDocumentPath,
+  sidebarRenderSignature
 } from "./view-model.js";
 import type SidebandCommentsPlugin from "./main.js";
 
 export const SIDEBAND_VIEW_TYPE = "sideband-comments-sidebar";
+
+const SCROLLING_PANES = [".sideband-explorer", ".sideband-detail"] as const;
 
 export class SidebandSidebarView extends ItemView {
   private selectedDocumentPath: string | undefined;
@@ -17,6 +20,7 @@ export class SidebandSidebarView extends ItemView {
   private selectionPreviewPath: string | undefined;
   private readonly collapsedDirectories = new Set<string>();
   private renderRevision = 0;
+  private renderedSignature: string | undefined;
 
   constructor(leaf: WorkspaceLeaf, private readonly plugin: SidebandCommentsPlugin) {
     super(leaf);
@@ -43,14 +47,44 @@ export class SidebandSidebarView extends ItemView {
     const models = await this.plugin.allModels();
     if (revision !== this.renderRevision) return;
     const container = this.containerEl.children[1] as HTMLElement;
-    container.empty();
-    container.addClass("sideband-sidebar");
-    this.selectionPreview = undefined;
-    this.selectionPreviewPath = undefined;
     const groups = groupThreadViewModels(models);
     const activePath = this.plugin.activeDocumentPath();
     this.selectedDocumentPath = selectDocumentPath(groups, this.selectedDocumentPath, activePath) ?? activePath;
 
+    // Opening a note the sidebar already shows fires file-open and active-leaf-change,
+    // which land here with nothing new to draw. Rebuilding would drop scroll position,
+    // open edit forms and half-typed replies, so keep the existing DOM instead.
+    const signature = sidebarRenderSignature(models, this.selectedDocumentPath, this.plugin.settings.showResolved);
+    if (signature === this.renderedSignature && container.hasChildNodes()) {
+      if (this.selectionPreviewPath) {
+        this.updateSelectionPreview(this.selectionPreviewPath, this.plugin.selectionFor(this.selectionPreviewPath));
+      }
+      return;
+    }
+    this.renderedSignature = signature;
+
+    // .sideband-sidebar keeps overflow hidden, so the explorer and the detail pane
+    // are the two elements that scroll. A rebuild starts both at 0.
+    const scrolled = SCROLLING_PANES.map((selector) =>
+      [selector, container.querySelector<HTMLElement>(selector)?.scrollTop ?? 0] as const
+    );
+    container.empty();
+    container.addClass("sideband-sidebar");
+    this.selectionPreview = undefined;
+    this.selectionPreviewPath = undefined;
+    await this.renderPanes(container, models, groups);
+    for (const [selector, scrollTop] of scrolled) {
+      if (scrollTop <= 0) continue;
+      const pane = container.querySelector<HTMLElement>(selector);
+      if (pane) pane.scrollTop = scrollTop;
+    }
+  }
+
+  private async renderPanes(
+    container: HTMLElement,
+    models: readonly ThreadViewModel[],
+    groups: readonly DocumentThreadViewModel[]
+  ): Promise<void> {
     const explorer = container.createDiv({ cls: "sideband-explorer" });
     const explorerHeading = explorer.createDiv({ cls: "sideband-pane-header" });
     explorerHeading.createEl("h3", { text: `Comments Explorer (${models.length})` });

@@ -6,7 +6,8 @@ import {
   groupThreadViewModels,
   resolvedToggleLabel,
   selectionPreviewText,
-  selectDocumentPath
+  selectDocumentPath,
+  sidebarRenderSignature
 } from "../src/view-model.js";
 
 const thread: ThreadState = {
@@ -97,5 +98,50 @@ describe("Obsidian sidebar view model", () => {
       },
       { kind: "file", name: "README.md" }
     ]);
+  });
+});
+
+describe("Obsidian sidebar rebuild decision", () => {
+  const models = (markdown = "target text", threads: readonly ThreadState[] = [thread]) =>
+    buildThreadViewModels(markdown, threads);
+
+  it("keeps the signature when opening the note the sidebar already shows", () => {
+    const before = sidebarRenderSignature(models(), "note.md", true);
+    const after = sidebarRenderSignature(models(), "note.md", true);
+    expect(after).toBe(before);
+  });
+
+  it("changes the signature when a reply lands on a thread", () => {
+    const replied: ThreadState = {
+      ...thread,
+      comments: [...thread.comments, {
+        id: "c2",
+        author: { id: "claude", name: "Claude" },
+        createdAt: "2026-09-02T00:00:00.000Z",
+        body: "Fixed"
+      }]
+    };
+    expect(sidebarRenderSignature(models("target text", [replied]), "note.md", true))
+      .not.toBe(sidebarRenderSignature(models(), "note.md", true));
+  });
+
+  it("changes the signature when an edit rewrites a comment body", () => {
+    const edited: ThreadState = {
+      ...thread,
+      comments: [{ ...thread.comments[0]!, body: "Review again" }]
+    };
+    expect(sidebarRenderSignature(models("target text", [edited]), "note.md", true))
+      .not.toBe(sidebarRenderSignature(models(), "note.md", true));
+  });
+
+  it("changes the signature when the anchor stops resolving", () => {
+    expect(sidebarRenderSignature(models("changed text"), "note.md", true))
+      .not.toBe(sidebarRenderSignature(models(), "note.md", true));
+  });
+
+  it("changes the signature when the selected note or resolved visibility changes", () => {
+    const base = sidebarRenderSignature(models(), "note.md", true);
+    expect(sidebarRenderSignature(models(), "other.md", true)).not.toBe(base);
+    expect(sidebarRenderSignature(models(), "note.md", false)).not.toBe(base);
   });
 });

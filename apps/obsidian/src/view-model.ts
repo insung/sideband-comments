@@ -102,3 +102,24 @@ export function resolvedToggleLabel(showResolved: boolean): "Hide resolved" | "S
 export function selectionPreviewText(selection: string): string {
   return selection.trim() || "New comment on editor selection";
 }
+
+export function sidebarRenderSignature(
+  models: readonly ThreadViewModel[],
+  selectedPath: string | undefined,
+  showResolved: boolean
+): string {
+  return JSON.stringify([
+    selectedPath ?? null,
+    showResolved,
+    models.map((model) => [
+      model.documentPath,
+      model.id,
+      model.status,
+      model.anchorState,
+      model.range ? [model.range.start, model.range.end] : null,
+      model.originalAnchor.exact,
+      model.suggestion?.replacement ?? null,
+      model.comments.map((comment) => [comment.id, comment.author.name, comment.createdAt, comment.body])
+    ])
+  ]);
+}
