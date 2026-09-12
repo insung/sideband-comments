@@ -8,6 +8,7 @@ import {
   Notice,
   Plugin,
   TFile,
+  requireApiVersion,
   type TAbstractFile
 } from "obsidian";
 import { EditorView } from "@codemirror/view";
@@ -144,8 +145,8 @@ export default class SidebandCommentsPlugin extends Plugin {
       byDocument.set(thread.documentPath, documentThreads);
     }
     const models = await Promise.all([...byDocument.entries()].map(async ([path, documentThreads]) => {
-      const file = this.app.vault.getFileByPath(path);
-      const markdown = file ? await this.app.vault.cachedRead(file) : "";
+      const file = this.app.vault.getAbstractFileByPath(path);
+      const markdown = file instanceof TFile ? await this.app.vault.cachedRead(file) : "";
       return buildThreadViewModels(markdown, documentThreads, this.settings.showResolved);
     }));
     return models.flat();
@@ -259,8 +260,8 @@ export default class SidebandCommentsPlugin extends Plugin {
   }
 
   async openDocument(documentPath: string) {
-    const file = this.app.vault.getFileByPath(documentPath);
-    if (!file) {
+    const file = this.app.vault.getAbstractFileByPath(documentPath);
+    if (!(file instanceof TFile)) {
       new Notice(`Cannot open comment file: ${documentPath}`);
       return undefined;
     }
@@ -275,7 +276,9 @@ export default class SidebandCommentsPlugin extends Plugin {
       leaf = this.app.workspace.getRightLeaf(false) ?? undefined;
       if (leaf) await leaf.setViewState({ type: SIDEBAND_VIEW_TYPE, active: true });
     }
-    if (leaf) this.app.workspace.revealLeaf(leaf);
+    if (requireApiVersion("1.7.2") && leaf) {
+      await this.app.workspace.revealLeaf(leaf);
+    }
   }
 
   private async onRename(file: TAbstractFile, oldPath: string): Promise<void> {
