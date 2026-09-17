@@ -38,3 +38,39 @@ export function pickCommentSelection(candidates: SelectionCandidates): Selection
   }
   return undefined;
 }
+
+export interface PinnedSelection {
+  readonly uri: string;
+  readonly version: number;
+}
+
+/**
+ * Whether a selection pinned from the Markdown preview still describes the document on screen.
+ *
+ * The preview reports offsets against one document version, so an edit invalidates the pin. A
+ * document that is no longer open cannot contradict the pin, so the pin stands.
+ */
+export function pinnedSelectionApplies(
+  pinned: PinnedSelection | undefined,
+  uri: string,
+  documentVersion: number | undefined
+): boolean {
+  if (!pinned || pinned.uri !== uri) return false;
+  return documentVersion === undefined || documentVersion === pinned.version;
+}
+
+export type ComposerState =
+  | { readonly kind: "disabled" }
+  | { readonly kind: "editor" }
+  | { readonly kind: "preview"; readonly text: string };
+
+/** How the sidebar composer should present itself for the document being shown. */
+export function composerState(
+  anchored: boolean,
+  uri: string,
+  pinned: { readonly uri: string; readonly text: string } | undefined
+): ComposerState {
+  if (!anchored) return { kind: "disabled" };
+  if (pinned && pinned.uri === uri) return { kind: "preview", text: pinned.text };
+  return { kind: "editor" };
+}

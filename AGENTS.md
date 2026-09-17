@@ -86,7 +86,22 @@ npm run check:app-versions
 npm run package --workspace apps/vscode
 ```
 
-### 4. publish
+### 4. 릴리즈 노트
+
+`apps/vscode/CHANGELOG.md` 맨 위에 새 버전 항목을 추가하고, 같은 내용을 GitHub Release 본문에 붙인다. Marketplace 는 이 파일을 Changelog 탭으로 보여준다.
+
+형식:
+
+- **영어로 쓴다.**
+- 섹션은 `### Added` → `### Changed` → `### Fixed` → `### Verification` 순서로, 해당하는 것만 쓴다. 배포 방식이 달라졌으면 `### Distribution` 을 쓴다.
+- 한 항목은 한 문장이고 동사로 시작한다 (`Comment on…`, `Show…`, `Write…`).
+- **사용자가 겪는 변화**를 쓴다. 내부 구현이나 파일 경로는 그 변화를 설명하는 데 필요할 때만 넣는다. 커밋 메시지를 그대로 옮기지 않는다.
+- `Fixed` 에는 무엇이 잘못됐었는지가 드러나야 한다. "Fix preview bug" 가 아니라 무엇이 안 되다가 되는지 쓴다.
+- `### Verification` 에는 **실제로 통과한 것만** 적는다. 사용자가 확인하지 않은 동작을 확인했다고 쓰지 않는다.
+
+릴리즈 노트는 버전을 올리는 시점, 즉 publish 직전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다.
+
+### 5. publish
 
 ```bash
 npx vsce publish --no-dependencies
@@ -96,7 +111,7 @@ npx vsce publish --no-dependencies
 
 **publish는 되돌릴 수 없다.** 한 번 올린 버전 번호는 재사용할 수 없고 unpublish는 확장 전체를 내리는 것이다. 에이전트는 사용자의 명시적 승인 없이 publish 하지 않는다.
 
-### 5. 태그
+### 6. 태그
 
 ```bash
 git tag vscode-<version> && git push origin vscode-<version>

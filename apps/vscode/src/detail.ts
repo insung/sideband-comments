@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import { captureAnchor, resolveAnchor, type QuoteAnchor, type ThreadState } from "@sideband-comments/core";
-import { pickCommentSelection, type EditorSelection } from "./selection-source.js";
+import {
+  composerState,
+  pickCommentSelection,
+  pinnedSelectionApplies,
+  type EditorSelection
+} from "./selection-source.js";
 import type { WorkspaceComments } from "./workspace.js";
 
 interface SelectedDocument {
@@ -110,8 +115,7 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
     const key = selected.uri.toString();
     const document = vscode.workspace.textDocuments.find((open) => open.uri.toString() === key);
     // A pinned preview selection is an explicit choice, so it outranks whatever an editor still holds.
-    const pinned = this.pinned?.uri === key ? this.pinned : undefined;
-    if (pinned && (!document || document.version === pinned.version)) return pinned.anchor;
+    if (pinnedSelectionApplies(this.pinned, key, document?.version)) return this.pinned!.anchor;
     if (!document) return undefined;
     const offsets = pickCommentSelection({
       uri: key,
@@ -256,7 +260,8 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
   }
 
   private composer(selected: SelectedDocument): string {
-    if (!this.composerReady) {
+    const state = composerState(this.composerReady, selected.uri.toString(), this.pinned);
+    if (state.kind === "disabled") {
       return `
       <section class="composer new-comment">
         <label>New comment</label>
@@ -264,15 +269,15 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
         <p class="hint">Select text in the editor, or select it in the Markdown preview and choose &ldquo;Add Comment on Selection&rdquo; from its right-click menu.</p>
       </section>`;
     }
-    const pinned = this.pinned?.uri === selected.uri.toString() ? this.pinned : undefined;
-    const quote = pinned ? `
+    const quote = state.kind === "preview" ? `
         <blockquote class="pinned">
-          <span>${escapeHtml(pinned.text)}</span>
+          <span>${escapeHtml(state.text)}</span>
           <button type="button" class="secondary" data-action="clearPinned" title="Forget this preview selection">Clear</button>
         </blockquote>` : "";
+    const label = state.kind === "preview" ? "New comment on the preview selection" : "New comment on the editor selection";
     return `
       <form class="composer new-comment" data-action="newComment">
-        <label for="new-comment">${pinned ? "New comment on the preview selection" : "New comment on the editor selection"}</label>${quote}
+        <label for="new-comment">${label}</label>${quote}
         <textarea id="new-comment" name="body" rows="3" placeholder="Write a comment\u2026" required></textarea>
         <div class="form-actions"><button type="submit">Comment</button></div>
       </form>`;
