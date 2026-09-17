@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -43,8 +43,105 @@ describe("JsonlThreadRepository", () => {
     }));
     expect(await repository.listByDocument("docs/new.md")).toEqual([]);
     expect((await repository.read("thread-1"))?.comments).toEqual([]);
-    const raw = await readFile(join(root, ".comments/threads/thread-1.jsonl"), "utf8");
+    const bundles = await readdir(repository.documentsDirectory);
+    expect(bundles).toHaveLength(1);
+    const raw = await readFile(join(repository.documentsDirectory, bundles[0]!), "utf8");
     expect(raw.trim().split("\n")).toHaveLength(3);
+  });
+
+  it("keeps every thread of one document in a single bundle", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sideband-bundle-"));
+    const repository = new JsonlThreadRepository(root);
+    const create = (threadId: string, documentPath: string) => repository.append(createEventFactory.created({
+      eventId: `created-${threadId}`,
+      threadId,
+      revision: 0,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+      actor,
+      documentPath,
+      anchor: { exact: "hello", prefix: "", suffix: "", position: 0 },
+      body: "comment"
+    }));
+
+    await create("thread-a", "docs/one.md");
+    await create("thread-b", "docs/one.md");
+    await create("thread-c", "docs/two.md");
+
+    expect(await readdir(repository.documentsDirectory)).toHaveLength(2);
+    expect((await repository.listByDocument("docs/one.md")).map((thread) => thread.id).sort())
+      .toEqual(["thread-a", "thread-b"]);
+  });
+
+  it("ignores a duplicate append instead of doubling the log", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sideband-duplicate-"));
+    const repository = new JsonlThreadRepository(root);
+    const created = createEventFactory.created({
+      eventId: "created",
+      threadId: "thread-1",
+      revision: 0,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+      actor,
+      documentPath: "docs/one.md",
+      anchor: { exact: "hello", prefix: "", suffix: "", position: 0 },
+      body: "comment"
+    });
+
+    await repository.append(created);
+    await repository.append(created);
+
+    expect(await repository.readEvents("thread-1")).toHaveLength(1);
+  });
+
+  it("migrates legacy per-thread files into document bundles without losing events", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sideband-migrate-"));
+    const repository = new JsonlThreadRepository(root);
+    await mkdir(repository.threadsDirectory, { recursive: true });
+    const legacy = createEventFactory.created({
+      eventId: "created",
+      threadId: "thread-legacy",
+      revision: 0,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+      actor,
+      documentPath: "docs/one.md",
+      anchor: { exact: "hello", prefix: "", suffix: "", position: 0 },
+      body: "comment"
+    });
+    await writeFile(repository.threadFile("thread-legacy"), `${JSON.stringify(legacy)}\n`);
+
+    expect((await repository.listByDocument("docs/one.md"))[0]?.id).toBe("thread-legacy");
+
+    const result = await repository.migrateLegacy();
+
+    expect(result.removedFiles).toBe(1);
+    expect(result.documentFiles).toBe(1);
+    expect(await readdir(repository.threadsDirectory)).toEqual([]);
+    expect((await repository.listByDocument("docs/one.md"))[0]?.id).toBe("thread-legacy");
+  });
+
+  it("hides deleted threads from list unless asked for them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sideband-hidden-"));
+    const repository = new JsonlThreadRepository(root);
+    await repository.append(createEventFactory.created({
+      eventId: "created",
+      threadId: "thread-1",
+      revision: 0,
+      occurredAt: "2026-09-01T00:00:00.000Z",
+      actor,
+      documentPath: "docs/one.md",
+      anchor: { exact: "hello", prefix: "", suffix: "", position: 0 },
+      body: "comment"
+    }));
+    await repository.append(createEventFactory.commentDeleted({
+      eventId: "deleted",
+      threadId: "thread-1",
+      revision: 1,
+      occurredAt: "2026-09-01T00:01:00.000Z",
+      actor,
+      commentId: "created"
+    }));
+
+    expect(await repository.list()).toEqual([]);
+    expect((await repository.list(true)).map((thread) => thread.id)).toEqual(["thread-1"]);
   });
 
   it("rejects path traversal in thread ids", async () => {

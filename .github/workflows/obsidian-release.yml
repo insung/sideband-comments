@@ -19,29 +19,67 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
-      - name: Check release version
+
+      # Obsidian releases are tagged with the bare manifest version. Releases for the VS Code
+      # extension share this repository, so a foreign tag is skipped rather than failed.
+      - name: Resolve release
+        id: gate
         env:
           RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
           manifest_version="$(node -p "require('./apps/obsidian/manifest.json').version")"
-          test "$RELEASE_TAG" = "$manifest_version"
-      - run: npm ci
-      - run: npm run package --workspace apps/obsidian
+          echo "version=$manifest_version" >> "$GITHUB_OUTPUT"
+          if [ "$RELEASE_TAG" = "$manifest_version" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::Release tag $RELEASE_TAG is not the Obsidian version $manifest_version."
+            exit 1
+          fi
+          echo "publish=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::Release $RELEASE_TAG is not the Obsidian release ($manifest_version); nothing to publish."
+
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm ci
+      - if: steps.gate.outputs.publish == 'true'
+        run: npm run package --workspace apps/obsidian
       - name: Upload Community Plugins assets
+        if: steps.gate.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: gh release upload "$RELEASE_TAG" apps/obsidian/dist/main.js apps/obsidian/dist/manifest.json apps/obsidian/dist/styles.css --clobber
       - name: Attest main bundle
+        if: steps.gate.outputs.publish == 'true'
         uses: actions/attest@v4
         with:
           subject-path: apps/obsidian/dist/main.js
       - name: Attest stylesheet
+        if: steps.gate.outputs.publish == 'true'
         uses: actions/attest@v4
         with:
           subject-path: apps/obsidian/dist/styles.css
+
+      # Obsidian installs from `releases/latest/download/…`, so any newer release without these
+      # assets silently breaks every install and update.
+      - name: Verify Obsidian can still install the plugin
+        if: steps.gate.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          if [ "$latest" != "$VERSION" ]; then
+            echo "::error::The repository's latest release is $latest, not the Obsidian release $VERSION. Obsidian reads releases/latest/download/manifest.json, so installs and updates are broken until $latest is made a pre-release or removed."
+            exit 1
+          fi
+          for asset in manifest.json main.js styles.css; do
+            code="$(curl -sL -o /dev/null -w '%{http_code}' "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$asset")"
+            test "$code" = "200" || { echo "::error::releases/latest/download/$asset returned $code"; exit 1; }
+          done

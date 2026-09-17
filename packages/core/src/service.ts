@@ -6,8 +6,8 @@ import type { Actor, QuoteAnchor, ThreadEvent, ThreadState } from "./types.js";
 export interface ThreadRepository {
   append(event: ThreadEvent): Promise<void>;
   readEvents(threadId: string): Promise<ThreadEvent[]>;
-  list(): Promise<ThreadState[]>;
-  listByDocument(documentPath: string): Promise<ThreadState[]>;
+  list(includeHidden?: boolean): Promise<ThreadState[]>;
+  listByDocument(documentPath: string, includeHidden?: boolean): Promise<ThreadState[]>;
 }
 
 export interface CommentServiceDependencies {
@@ -137,7 +137,7 @@ export class CommentService {
   async relocateDocument(from: string, to: string): Promise<ThreadState[]> {
     const source = normalizeDocumentPath(from);
     const destination = normalizeDocumentPath(to);
-    const threads = await this.repository.listByDocument(source);
+    const threads = await this.repository.listByDocument(source, true);
     return Promise.all(threads.map((thread) => this.relocate(thread.id, destination)));
   }
 

@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 interface ExtensionManifest {
+  activationEvents?: string[];
   contributes: {
+    "markdown.markdownItPlugins"?: boolean;
+    "markdown.previewScripts"?: string[];
     commands?: Array<{ command: string; title: string }>;
     viewsContainers?: { secondarySidebar?: Array<{ id: string; title: string }> };
     views?: Record<string, Array<{ id: string; name: string; contextualTitle?: string; type?: string }>>;
@@ -75,6 +78,32 @@ describe("VS Code contributions", () => {
       expect.objectContaining({ command: "sidebandComments.showResolved", when: expect.stringContaining("workbench.panel.comments") }),
       expect.objectContaining({ command: "sidebandComments.hideResolved", when: expect.stringContaining("workbench.panel.comments") })
     ]));
+  });
+
+  it("lets the Markdown preview author comments on its own selection", () => {
+    expect(manifest.activationEvents).toContain("onLanguage:markdown");
+    expect(manifest.contributes["markdown.markdownItPlugins"]).toBe(true);
+    expect(manifest.contributes["markdown.previewScripts"]).toContain("./resources/preview.js");
+    expect(manifest.contributes.commands).toContainEqual(
+      expect.objectContaining({
+        command: "sidebandComments.addFromPreview",
+        title: "Sideband Comments: Add Comment on Selection"
+      })
+    );
+    const previewMenu = manifest.contributes.menus["webview/context"]?.find(
+      (candidate) => candidate.command === "sidebandComments.addFromPreview"
+    );
+    expect(previewMenu?.group).toBe("z_commands@100");
+    // VS Code renders the preview as a panel or as a custom editor, each with its own id.
+    expect(previewMenu?.when).toContain("markdown.preview");
+    expect(previewMenu?.when).toContain("vscode.markdown.preview.editor");
+    expect(previewMenu?.when).toContain("sidebandPreviewSelection");
+  });
+
+  it("contributes an explicit storage consolidation command", () => {
+    expect(manifest.contributes.commands).toContainEqual(
+      expect.objectContaining({ command: "sidebandComments.consolidateStorage" })
+    );
   });
 
   it("does not require a separate original-text diff action", () => {

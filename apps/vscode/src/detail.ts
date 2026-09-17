@@ -1,11 +1,19 @@
 import * as vscode from "vscode";
-import { captureAnchor, resolveAnchor, type ThreadState } from "@sideband-comments/core";
+import { captureAnchor, resolveAnchor, type QuoteAnchor, type ThreadState } from "@sideband-comments/core";
+import { pickCommentSelection, type EditorSelection } from "./selection-source.js";
 import type { WorkspaceComments } from "./workspace.js";
 
 interface SelectedDocument {
   uri: vscode.Uri;
   workspace: WorkspaceComments;
   documentPath: string;
+}
+
+export interface PinnedAnchor {
+  readonly uri: string;
+  readonly version: number;
+  readonly anchor: QuoteAnchor;
+  readonly text: string;
 }
 
 interface DetailMessage {
@@ -34,6 +42,9 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
   private selected: SelectedDocument | undefined;
   private renderRevision = 0;
   private readonly pendingDeletes = new Set<string>();
+  private readonly lastSelection = new Map<string, EditorSelection>();
+  private pinned: PinnedAnchor | undefined;
+  private composerReady = false;
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -69,12 +80,56 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
       void this.render().catch(error => this.log(`detail render error=${error}`));
       return;
     }
+    if (this.pinned && this.pinned.uri !== uri.toString()) this.pinned = undefined;
     this.selected = { uri, workspace, documentPath: workspace.relativePath(uri) };
     void this.render().catch(error => this.log(`detail render error=${error}`));
   }
 
   refresh(): void {
     void this.render().catch(error => this.log(`detail render error=${error}`));
+  }
+
+  /** Remembers the newest real selection so the sidebar keeps working once focus leaves the editor. */
+  noteSelection(editor: vscode.TextEditor): void {
+    if (editor.document.uri.scheme !== "comment" && !editor.selection.isEmpty) {
+      this.lastSelection.set(editor.document.uri.toString(), this.selectionOf(editor));
+    }
+    if (this.composerReady !== (this.pendingAnchor() !== undefined)) this.refresh();
+  }
+
+  /** Pins a Markdown preview selection so its comment can be written in this sidebar. */
+  pinPreviewAnchor(pinned: PinnedAnchor): void {
+    this.pinned = pinned;
+    void this.render(true).catch(error => this.log(`detail render error=${error}`));
+  }
+
+  /** The anchor the composer would use right now, or undefined while nothing is selected. */
+  private pendingAnchor(): QuoteAnchor | undefined {
+    const selected = this.selected;
+    if (!selected) return undefined;
+    const key = selected.uri.toString();
+    const document = vscode.workspace.textDocuments.find((open) => open.uri.toString() === key);
+    // A pinned preview selection is an explicit choice, so it outranks whatever an editor still holds.
+    const pinned = this.pinned?.uri === key ? this.pinned : undefined;
+    if (pinned && (!document || document.version === pinned.version)) return pinned.anchor;
+    if (!document) return undefined;
+    const offsets = pickCommentSelection({
+      uri: key,
+      documentVersion: document.version,
+      active: vscode.window.activeTextEditor ? this.selectionOf(vscode.window.activeTextEditor) : undefined,
+      visible: vscode.window.visibleTextEditors.map((editor) => this.selectionOf(editor)),
+      remembered: this.lastSelection.get(key)
+    });
+    return offsets ? captureAnchor(document.getText(), offsets.start, offsets.end) : undefined;
+  }
+
+  private selectionOf(editor: vscode.TextEditor): EditorSelection {
+    return {
+      uri: editor.document.uri.toString(),
+      version: editor.document.version,
+      start: editor.document.offsetAt(editor.selection.start),
+      end: editor.document.offsetAt(editor.selection.end)
+    };
   }
 
   private async handleMessage(message: DetailMessage): Promise<void> {
@@ -123,6 +178,10 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
             await selected.workspace.service.resolve(message.threadId);
           }
           break;
+        case "clearPinned":
+          this.pinned = undefined;
+          await this.render();
+          return;
         case "openAnchor":
           if (!message.threadId) return;
           await this.openAnchor(selected, message.threadId);
@@ -142,19 +201,12 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
   }
 
   private async createFromSelection(selected: SelectedDocument, body: string): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.uri.toString() !== selected.uri.toString() || editor.selection.isEmpty) {
-      throw new Error("Select text in the active file before adding a comment.");
+    const anchor = this.pendingAnchor();
+    if (!anchor) {
+      throw new Error("Select text in the editor, or right-click your Markdown preview selection and choose \u201cAdd Comment on Selection\u201d.");
     }
-    await selected.workspace.service.create({
-      documentPath: selected.documentPath,
-      anchor: captureAnchor(
-        editor.document.getText(),
-        editor.document.offsetAt(editor.selection.start),
-        editor.document.offsetAt(editor.selection.end)
-      ),
-      body
-    });
+    await selected.workspace.service.create({ documentPath: selected.documentPath, anchor, body });
+    this.pinned = undefined;
   }
 
   private async openAnchor(selected: SelectedDocument, threadId: string): Promise<void> {
@@ -171,7 +223,7 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
     editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
   }
 
-  private async render(): Promise<void> {
+  private async render(focusComposer = false): Promise<void> {
     const view = this.view;
     if (!view) return;
     const revision = ++this.renderRevision;
@@ -186,20 +238,44 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
     if (revision !== this.renderRevision) return;
     view.title = "Comment Details";
     view.description = selected.documentPath;
-    await view.webview.postMessage({ type: "render", documentUri: selected.uri.toString(), title: selected.documentPath, content: this.content(threads) });
+    this.composerReady = this.pendingAnchor() !== undefined;
+    await view.webview.postMessage({
+      type: "render",
+      documentUri: selected.uri.toString(),
+      title: selected.documentPath,
+      focusComposer,
+      content: this.content(threads, selected)
+    });
   }
 
-  private content(threads: readonly ThreadState[]): string {
+  private content(threads: readonly ThreadState[], selected: SelectedDocument): string {
     const cards = threads.length
       ? threads.map((thread) => this.threadCard(thread)).join("")
       : `<p class="empty">No comments for this file.</p>`;
+    return `${this.composer(selected)}<div class="threads">${cards}</div>`;
+  }
+
+  private composer(selected: SelectedDocument): string {
+    if (!this.composerReady) {
+      return `
+      <section class="composer new-comment">
+        <label>New comment</label>
+        <textarea rows="3" disabled placeholder="No selection yet."></textarea>
+        <p class="hint">Select text in the editor, or select it in the Markdown preview and choose &ldquo;Add Comment on Selection&rdquo; from its right-click menu.</p>
+      </section>`;
+    }
+    const pinned = this.pinned?.uri === selected.uri.toString() ? this.pinned : undefined;
+    const quote = pinned ? `
+        <blockquote class="pinned">
+          <span>${escapeHtml(pinned.text)}</span>
+          <button type="button" class="secondary" data-action="clearPinned" title="Forget this preview selection">Clear</button>
+        </blockquote>` : "";
     return `
       <form class="composer new-comment" data-action="newComment">
-        <label for="new-comment">New comment on editor selection</label>
-        <textarea id="new-comment" name="body" rows="3" placeholder="Select text in the editor, then write a comment…" required></textarea>
+        <label for="new-comment">${pinned ? "New comment on the preview selection" : "New comment on the editor selection"}</label>${quote}
+        <textarea id="new-comment" name="body" rows="3" placeholder="Write a comment\u2026" required></textarea>
         <div class="form-actions"><button type="submit">Comment</button></div>
-      </form>
-      <div class="threads">${cards}</div>`;
+      </form>`;
   }
 
   private threadCard(thread: ThreadState): string {
@@ -267,6 +343,10 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
           .edit-form, .composer { margin-top: 8px; }
           .new-comment { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--vscode-widget-border); }
           .form-actions { justify-content: flex-end; margin-top: 6px; }
+          .hint { margin: 6px 0 0; color: var(--vscode-descriptionForeground); font-size: 11px; }
+          .pinned { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin: 0 0 6px; padding: 6px 8px; border-left: 3px solid var(--vscode-focusBorder); background: var(--vscode-textBlockQuote-background); font-size: 11px; }
+          .pinned span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+          textarea:disabled { opacity: .6; }
         </style>
       </head>
       <body>${title}<main>${content}</main>
@@ -281,11 +361,18 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
             saved.scroll[documentUri] = window.scrollY;
             persist();
           };
+          const focusComposer = () => {
+            const composer = document.getElementById('new-comment');
+            if (!composer) return;
+            composer.focus();
+            composer.setSelectionRange(composer.value.length, composer.value.length);
+          };
           const restore = () => {
             document.querySelectorAll('form').forEach(form => {
               const key = formKey(form), field = form.querySelector('textarea');
-              if (Object.hasOwn(saved.drafts, key)) field.value = saved.drafts[key];
-              form.querySelector('button[type=submit]').disabled = [...pending.values()].some(p => p.key === key);
+              if (field && Object.hasOwn(saved.drafts, key)) field.value = saved.drafts[key];
+              const submit = form.querySelector('button[type=submit]');
+              if (submit) submit.disabled = [...pending.values()].some(p => p.key === key);
             });
             document.querySelectorAll('.edit-form').forEach(form => form.hidden = !saved.editing[formKey(form)]);
             window.scrollTo(0, saved.scroll[documentUri] || 0);
@@ -306,7 +393,10 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
               persist(); restore(); return;
             }
             if (message.type !== 'render') return;
-            if (documentUri === message.documentUri && lastContent === message.content) return;
+            if (documentUri === message.documentUri && lastContent === message.content) {
+              if (message.focusComposer) focusComposer();
+              return;
+            }
             const focused = document.activeElement;
             const focusKey = focused?.form ? formKey(focused.form) : undefined;
             const start = focused?.selectionStart, end = focused?.selectionEnd;
@@ -320,6 +410,7 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
                 field.focus({preventScroll:true}); field.setSelectionRange(start, end);
               }
             });
+            if (message.focusComposer) focusComposer();
           });
           document.addEventListener('input', event => {
             if (!(event.target instanceof HTMLTextAreaElement) || !event.target.form) return;
