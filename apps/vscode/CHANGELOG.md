@@ -23,12 +23,12 @@ are published with each [GitHub release](https://github.com/insung/sideband-comm
   The pinned text stays visible above the composer and can be cleared.
 - The sidebar composer is disabled, with an explanation of how to select text, while nothing is
   selected. It no longer accepts a comment only to reject it on submit.
-- Comment stores discovered outside the workspace are watched for changes, so comments written in
-  Obsidian appear without a manual refresh.
+- Comments Explorer also lists projects found outside the workspace, and their stores are watched
+  for changes, so comments written in Obsidian appear without a manual refresh.
 
 ### Verification
 
-- Typecheck and 97 tests passed.
+- Typecheck and 105 tests passed.
 - Extension packaged as `sideband-comments-vscode-1.0.6.vsix` with the preview script included.
 
 ## 1.0.5
@@ -41,6 +41,7 @@ are published with each [GitHub release](https://github.com/insung/sideband-comm
 
 ### Changed
 
-- New comments are stored by logical document in `.comments/documents/<document-id>.jsonl`.
+- New comments are stored by logical document in `.comments/documents/<bundle-id>.jsonl`, one
+  file per document.
 - Existing `.comments/threads/*.jsonl` files remain readable and can be consolidated without losing
   comment events.

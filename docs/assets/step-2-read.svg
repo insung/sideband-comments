@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 220" width="520" height="220" role="img" aria-label="A robot reading the sticky note through a magnifier">
+  <style>
+    .bg{fill:#FFFFFF;stroke:#C9D6E6} .paper{fill:#FFFFFF;stroke:#C9D6E6} .line{fill:#D3DEEC}
+    .ink{fill:#1B2A3A} .soft{fill:#5A6B7D;stroke:#5A6B7D} .link{fill:#3F74C9;stroke:#3F74C9}
+    .note{fill:#FFC93C;stroke:#D99B00} .noteink{fill:#4A3800;opacity:.55}
+    .alarm{fill:#FF6B5A;stroke:#FF6B5A} .ok{fill:#2FB08C;stroke:#2FB08C}
+    text{font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px}
+    @media (prefers-color-scheme: dark) {
+      .bg{fill:#1B232E;stroke:#33404F} .paper{fill:#253040;stroke:#33404F} .line{fill:#3C4A5C}
+      .ink{fill:#E9EFF7} .soft{fill:#9FB0C4;stroke:#9FB0C4} .link{fill:#7BA6EF;stroke:#7BA6EF}
+      .note{fill:#FFC93C;stroke:#A87700} .noteink{fill:#3A2C00;opacity:.5}
+      .alarm{fill:#FF8575;stroke:#FF8575} .ok{fill:#4FD0AB;stroke:#4FD0AB}
+    }
+  </style>
+  <rect class="bg" x="1.5" y="1.5" width="517" height="217" rx="16" stroke-width="3"/>
+<rect class="paper" x="40" y="60" width="96" height="88" rx="16" stroke-width="3"/><circle class="link" cx="68" cy="95" r="8"/><circle class="link" cx="108" cy="95" r="8"/><rect class="link" x="72" y="118" width="32" height="7" rx="3.5"/><path class="link" d="M88 60 L88 42" stroke-width="3" stroke-linecap="round"/><circle class="link" cx="88" cy="37" r="6"/><rect class="note" x="330" y="66" width="120" height="90" rx="10" stroke-width="3"/><rect class="noteink" x="346" y="88" width="82" height="7" rx="3.5"/><rect class="noteink" x="346" y="106" width="68" height="7" rx="3.5"/><circle cx="245" cy="104" r="26" fill="none" class="soft" stroke-width="5"/><path class="soft" d="M263 122 L284 143" stroke-width="6" stroke-linecap="round"/><text class="ink" x="196" y="182">list</text></svg>
