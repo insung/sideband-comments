@@ -1,8 +1,11 @@
 import { readdir } from "node:fs/promises";
+import { basename } from "node:path";
 import * as vscode from "vscode";
 import { SidebandCommentController } from "./comments.js";
 import { SidebandCommentsDetailView } from "./detail.js";
 import { mapRenamedDocument } from "./paths.js";
+import { findProjectRoot } from "./project-root.js";
+import { capturePreviewSelection, extendMarkdownIt } from "./preview.js";
 import { SidebandCommentsView } from "./tree.js";
 import { WorkspaceComments } from "./workspace.js";
 
@@ -22,13 +25,13 @@ export function activate(context: vscode.ExtensionContext) {
         log(`repository root=${folder.uri.toString()} comments=${workspace.repository.commentsDirectory}`);
         let foldSuccess = 0, foldFailure = 0;
         const list = workspace.repository.list.bind(workspace.repository);
-        workspace.repository.list = async () => {
+        workspace.repository.list = async (includeHidden = false) => {
           const files = await readdir(workspace.repository.threadsDirectory).catch((error: NodeJS.ErrnoException) => {
             if (error.code === "ENOENT") return [];
             throw error;
           });
           log(`read repository=${folder.uri.toString()} threadFiles=${files.filter(file => file.endsWith(".jsonl")).length}`);
-          return list();
+          return list(includeHidden);
         };
         const read = workspace.repository.read.bind(workspace.repository);
         workspace.repository.read = async (id) => {
@@ -47,18 +50,55 @@ export function activate(context: vscode.ExtensionContext) {
   };
   refreshWorkspaces();
 
-  const workspaceFor = (uri: vscode.Uri) => {
-    const folder = vscode.workspace.getWorkspaceFolder(uri);
-    return folder ? workspaces.get(folder.uri.toString()) : undefined;
+  const watcher = vscode.workspace.createFileSystemWatcher("**/.comments/{threads,documents}/*.jsonl");
+  let reloadTimer: NodeJS.Timeout | undefined;
+  const scheduleReload = () => {
+    if (reloadTimer) clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(() => {
+      reloadTimer = undefined;
+      void comments.reloadActive("watcher").catch(error => log(`reload error=${error}`));
+      tree.refresh();
+      detail.refresh();
+    }, 100);
   };
+  watcher.onDidCreate(scheduleReload);
+  watcher.onDidChange(scheduleReload);
+  watcher.onDidDelete(scheduleReload);
+
+  // Files opened outside every workspace folder still belong to a project on disk, so they
+  // keep their comments beside the document instead of losing the feature entirely.
+  const detached = new Map<string, WorkspaceComments>();
+  const workspaceFor = (uri: vscode.Uri): WorkspaceComments | undefined => {
+    const folder = vscode.workspace.getWorkspaceFolder(uri);
+    if (folder) return workspaces.get(folder.uri.toString());
+    if (uri.scheme !== "file") return undefined;
+    const root = findProjectRoot(uri.fsPath);
+    if (!root) return undefined;
+    const rootUri = vscode.Uri.file(root);
+    const key = rootUri.toString();
+    const existing = detached.get(key);
+    if (existing) return existing;
+    const workspace = new WorkspaceComments({ uri: rootUri, name: basename(root), index: -1 });
+    log(`detached repository root=${key} comments=${workspace.repository.commentsDirectory}`);
+    const storeWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(rootUri, ".comments/{threads,documents}/*.jsonl")
+    );
+    storeWatcher.onDidCreate(scheduleReload);
+    storeWatcher.onDidChange(scheduleReload);
+    storeWatcher.onDidDelete(scheduleReload);
+    context.subscriptions.push(storeWatcher);
+    detached.set(key, workspace);
+    return workspace;
+  };
+  const allWorkspaces = () => [...workspaces.values(), ...detached.values()];
   const comments = new SidebandCommentController(workspaceFor, log);
   let tree!: SidebandCommentsView;
   const detail = new SidebandCommentsDetailView(context, workspaceFor, async () => {
     await comments.reloadActive("detail write");
     tree.refresh();
   }, log);
-  tree = new SidebandCommentsView(context, () => [...workspaces.values()], async (group) => {
-    const workspace = workspaces.get(group.workspaceKey);
+  tree = new SidebandCommentsView(context, allWorkspaces, async (group) => {
+    const workspace = workspaces.get(group.workspaceKey) ?? detached.get(group.workspaceKey);
     if (!workspace) return;
     const uri = vscode.Uri.joinPath(workspace.folder.uri, ...group.documentPath.split("/"));
     log(`Explorer selected uri=${uri.toString()}`);
@@ -89,6 +129,22 @@ export function activate(context: vscode.ExtensionContext) {
       detail.refresh();
       await vscode.commands.executeCommand("sidebandComments.detailView.focus");
     }
+  });
+  register("sidebandComments.addFromPreview", async (previewContext: unknown) => {
+    const { uri, version, anchor, text } = await capturePreviewSelection(previewContext, workspaceFor);
+    detail.selectUri(uri);
+    await vscode.commands.executeCommand("sidebandComments.detailView.focus");
+    detail.pinPreviewAnchor({ uri: uri.toString(), version, anchor, text });
+  });
+  register("sidebandComments.consolidateStorage", async () => {
+    for (const workspace of allWorkspaces()) {
+      const result = await workspace.repository.migrateLegacy();
+      log(`storage consolidated ${JSON.stringify(result)}`);
+    }
+    await comments.reloadActive("storage consolidation");
+    tree.refresh();
+    detail.refresh();
+    void vscode.window.showInformationMessage("Sideband Comments: Comment history is grouped by document.");
   });
   register("sidebandComments.create", async (reply: vscode.CommentReply) => {
     await comments.submit(reply);
@@ -140,20 +196,6 @@ export function activate(context: vscode.ExtensionContext) {
     detail.refresh();
   });
 
-  const watcher = vscode.workspace.createFileSystemWatcher("**/.comments/threads/*.jsonl");
-  let reloadTimer: NodeJS.Timeout | undefined;
-  const scheduleReload = () => {
-    if (reloadTimer) clearTimeout(reloadTimer);
-    reloadTimer = setTimeout(() => {
-      reloadTimer = undefined;
-      void comments.reloadActive("watcher").catch(error => log(`reload error=${error}`));
-      tree.refresh();
-      detail.refresh();
-    }, 100);
-  };
-  watcher.onDidCreate(scheduleReload);
-  watcher.onDidChange(scheduleReload);
-  watcher.onDidDelete(scheduleReload);
 
   context.subscriptions.push(
     comments,
@@ -162,12 +204,17 @@ export function activate(context: vscode.ExtensionContext) {
     watcher,
     { dispose: () => { if (reloadTimer) clearTimeout(reloadTimer); } },
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      detached.clear();
       refreshWorkspaces();
       void comments.reloadActive("workspace folders").catch(error => log(`reload error=${error}`));
       tree.refresh();
       detail.refresh();
     }),
-    vscode.window.onDidChangeActiveTextEditor((editor) => detail.selectUri(editor?.document.uri)),
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      detail.selectUri(editor?.document.uri);
+      if (editor) detail.noteSelection(editor);
+    }),
+    vscode.window.onDidChangeTextEditorSelection((event) => detail.noteSelection(event.textEditor)),
     vscode.workspace.onDidSaveTextDocument((document) => {
       if (vscode.window.activeTextEditor?.document.uri.toString() === document.uri.toString()) {
         void comments.load(document, "save").catch(error => log(`reload error=${error}`));
@@ -194,7 +241,7 @@ export function activate(context: vscode.ExtensionContext) {
         } catch {
           continue;
         }
-        const threads = await workspace.repository.list();
+        const threads = await workspace.repository.list(true);
         for (const thread of threads) {
           const destination = mapRenamedDocument(thread.documentPath, oldPath, newPath);
           if (destination) await workspace.service.relocate(thread.id, destination);
@@ -205,7 +252,7 @@ export function activate(context: vscode.ExtensionContext) {
       detail.refresh();
     })
   );
-  return { comments, tree, detail };
+  return { comments, tree, detail, extendMarkdownIt };
 }
 
 export function deactivate(): void {}

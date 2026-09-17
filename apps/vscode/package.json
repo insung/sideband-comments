@@ -2,7 +2,7 @@
   "name": "sideband-comments-vscode",
   "displayName": "Sideband Comments",
   "description": "Document-grounded AI collaboration with shared comments across VS Code and Obsidian.",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "private": true,
   "type": "module",
   "publisher": "insung",
@@ -14,8 +14,20 @@
   "engines": {
     "vscode": "^1.106.0"
   },
-  "categories": ["Other", "Visualization"],
-  "keywords": ["comments", "review", "ai collaboration", "obsidian", "markdown", "annotations", "sidecar", "jsonl"],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "comments",
+    "review",
+    "ai collaboration",
+    "obsidian",
+    "markdown",
+    "annotations",
+    "sidecar",
+    "jsonl"
+  ],
   "icon": "resources/sideband-comments-icon.png",
   "galleryBanner": {
     "color": "#10184f",
@@ -27,23 +39,78 @@
     "url": "https://github.com/insung/sideband-comments/issues"
   },
   "main": "./dist/extension.cjs",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:markdown"
+  ],
   "contributes": {
+    "markdown.markdownItPlugins": true,
+    "markdown.previewScripts": [
+      "./resources/preview.js"
+    ],
     "commands": [
-      { "command": "sidebandComments.add", "title": "Sideband Comments: Add Comment on Selection" },
-      { "command": "sidebandComments.create", "title": "Comment", "enablement": "!commentIsEmpty" },
-      { "command": "sidebandComments.reply", "title": "Reply", "enablement": "!commentIsEmpty" },
-      { "command": "sidebandComments.resolve", "title": "Sideband Comments: Resolve" },
-      { "command": "sidebandComments.reopen", "title": "Sideband Comments: Reopen" },
-      { "command": "sidebandComments.reanchor", "title": "Sideband Comments: Re-anchor to Selection" },
-      { "command": "sidebandComments.deleteComment", "title": "Sideband Comments: Delete Comment", "icon": "$(trash)" },
-      { "command": "sidebandComments.showResolved", "title": "Sideband Comments: Show Resolved", "icon": "$(eye)" },
-      { "command": "sidebandComments.hideResolved", "title": "Sideband Comments: Hide Resolved", "icon": "$(eye-closed)" },
-      { "command": "sidebandComments.reload", "title": "Sideband Comments: Reload", "icon": "$(refresh)" }
+      {
+        "command": "sidebandComments.addFromPreview",
+        "title": "Sideband Comments: Add Comment on Selection"
+      },
+      {
+        "command": "sidebandComments.consolidateStorage",
+        "title": "Sideband Comments: Consolidate Comment Storage"
+      },
+      {
+        "command": "sidebandComments.add",
+        "title": "Sideband Comments: Add Comment on Selection"
+      },
+      {
+        "command": "sidebandComments.create",
+        "title": "Comment",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "sidebandComments.reply",
+        "title": "Reply",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "sidebandComments.resolve",
+        "title": "Sideband Comments: Resolve"
+      },
+      {
+        "command": "sidebandComments.reopen",
+        "title": "Sideband Comments: Reopen"
+      },
+      {
+        "command": "sidebandComments.reanchor",
+        "title": "Sideband Comments: Re-anchor to Selection"
+      },
+      {
+        "command": "sidebandComments.deleteComment",
+        "title": "Sideband Comments: Delete Comment",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "sidebandComments.showResolved",
+        "title": "Sideband Comments: Show Resolved",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "sidebandComments.hideResolved",
+        "title": "Sideband Comments: Hide Resolved",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "sidebandComments.reload",
+        "title": "Sideband Comments: Reload",
+        "icon": "$(refresh)"
+      }
     ],
     "viewsContainers": {
       "secondarySidebar": [
-        { "id": "sideband-comments-overview", "title": "Sideband Comments", "icon": "$(comment-discussion)" }
+        {
+          "id": "sideband-comments-overview",
+          "title": "Sideband Comments",
+          "icon": "$(comment-discussion)"
+        }
       ]
     },
     "views": {
@@ -79,25 +146,71 @@
       }
     },
     "menus": {
+      "webview/context": [
+        {
+          "command": "sidebandComments.addFromPreview",
+          "when": "(webviewId == 'markdown.preview' || webviewId == 'vscode.markdown.preview.editor') && sidebandPreviewSelection",
+          "group": "z_commands@100"
+        }
+      ],
       "editor/context": [
-        { "command": "sidebandComments.add", "when": "editorHasSelection", "group": "z_commands@100" }
+        {
+          "command": "sidebandComments.add",
+          "when": "editorHasSelection",
+          "group": "z_commands@100"
+        }
       ],
       "view/title": [
-        { "command": "sidebandComments.showResolved", "when": "(view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments) && !sidebandComments.showResolved", "group": "navigation@1" },
-        { "command": "sidebandComments.hideResolved", "when": "(view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments) && sidebandComments.showResolved", "group": "navigation@1" },
-        { "command": "sidebandComments.reload", "when": "view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments", "group": "navigation@2" }
+        {
+          "command": "sidebandComments.showResolved",
+          "when": "(view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments) && !sidebandComments.showResolved",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sidebandComments.hideResolved",
+          "when": "(view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments) && sidebandComments.showResolved",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sidebandComments.reload",
+          "when": "view == sidebandComments.overviewView || view == sidebandComments.detailView || view == workbench.panel.comments",
+          "group": "navigation@2"
+        }
       ],
       "comments/commentThread/title": [
-        { "command": "sidebandComments.resolve", "when": "commentThread == sideband.open", "group": "inline@1" },
-        { "command": "sidebandComments.reopen", "when": "commentThread == sideband.resolved", "group": "inline@1" },
-        { "command": "sidebandComments.reanchor", "group": "inline@2" }
+        {
+          "command": "sidebandComments.resolve",
+          "when": "commentThread == sideband.open",
+          "group": "inline@1"
+        },
+        {
+          "command": "sidebandComments.reopen",
+          "when": "commentThread == sideband.resolved",
+          "group": "inline@1"
+        },
+        {
+          "command": "sidebandComments.reanchor",
+          "group": "inline@2"
+        }
       ],
       "comments/comment/title": [
-        { "command": "sidebandComments.deleteComment", "when": "comment == sideband.comment", "group": "inline@3" }
+        {
+          "command": "sidebandComments.deleteComment",
+          "when": "comment == sideband.comment",
+          "group": "inline@3"
+        }
       ],
       "comments/commentThread/context": [
-        { "command": "sidebandComments.create", "when": "commentController == sidebandComments && commentThreadIsEmpty", "group": "inline" },
-        { "command": "sidebandComments.reply", "when": "commentController == sidebandComments && !commentThreadIsEmpty", "group": "inline" }
+        {
+          "command": "sidebandComments.create",
+          "when": "commentController == sidebandComments && commentThreadIsEmpty",
+          "group": "inline"
+        },
+        {
+          "command": "sidebandComments.reply",
+          "when": "commentController == sidebandComments && !commentThreadIsEmpty",
+          "group": "inline"
+        }
       ]
     }
   },
@@ -105,7 +218,7 @@
     "test:integration": "npm run build && node test/integration/run.mjs",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "prepackage": "node ../../scripts/check-app-version-line.mjs",
-    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-1.0.0.vsix"
+    "package": "npm run build && vsce package --no-dependencies --out dist/sideband-comments-vscode-1.0.6.vsix"
   },
   "dependencies": {
     "@sideband-comments/core": "0.1.0",
