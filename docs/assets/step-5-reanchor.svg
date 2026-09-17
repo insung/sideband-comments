@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 220" width="520" height="220" role="img" aria-label="The sticky note is attached again to the new sentence">
+  <style>
+    .bg{fill:#FFFFFF;stroke:#C9D6E6} .paper{fill:#FFFFFF;stroke:#C9D6E6} .line{fill:#D3DEEC}
+    .ink{fill:#1B2A3A} .soft{fill:#5A6B7D;stroke:#5A6B7D} .link{fill:#3F74C9;stroke:#3F74C9}
+    .note{fill:#FFC93C;stroke:#D99B00} .noteink{fill:#4A3800;opacity:.55}
+    .alarm{fill:#FF6B5A;stroke:#FF6B5A} .ok{fill:#2FB08C;stroke:#2FB08C}
+    text{font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px}
+    @media (prefers-color-scheme: dark) {
+      .bg{fill:#1B232E;stroke:#33404F} .paper{fill:#253040;stroke:#33404F} .line{fill:#3C4A5C}
+      .ink{fill:#E9EFF7} .soft{fill:#9FB0C4;stroke:#9FB0C4} .link{fill:#7BA6EF;stroke:#7BA6EF}
+      .note{fill:#FFC93C;stroke:#A87700} .noteink{fill:#3A2C00;opacity:.5}
+      .alarm{fill:#FF8575;stroke:#FF8575} .ok{fill:#4FD0AB;stroke:#4FD0AB}
+    }
+  </style>
+  <rect class="bg" x="1.5" y="1.5" width="517" height="217" rx="16" stroke-width="3"/>
+<rect class="paper" x="40" y="35" width="170" height="150" rx="10" stroke-width="3"/><rect class="line" x="58" y="76" width="130" height="7" rx="3.5"/><rect class="line" x="58" y="98" width="100" height="7" rx="3.5"/><rect class="ok" x="54" y="115" width="148" height="18" rx="6" opacity=".45" stroke="none"/><rect class="line" x="58" y="142" width="118" height="7" rx="3.5"/><rect class="line" x="58" y="164" width="82" height="7" rx="3.5"/><path class="ok" d="M300 96 C266 88 232 100 216 122" stroke-width="3" stroke-linecap="round" fill="none"/><path class="ok" d="M216 122 L232 116 M216 122 L226 132" stroke-width="3" stroke-linecap="round" fill="none"/><rect class="note" stroke="#2FB08C" x="300" y="58" width="86" height="74" rx="10" stroke-width="3"/><rect class="noteink" x="316" y="80" width="48" height="7" rx="3.5"/><rect class="noteink" x="316" y="98" width="34" height="7" rx="3.5"/><text class="ink" x="296" y="170">reanchor</text></svg>

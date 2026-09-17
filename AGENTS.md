@@ -160,6 +160,16 @@ Obsidian은 플러그인을 **`https://github.com/insung/sideband-comments/relea
 - 프리뷰 안의 선택을 확장으로 전달하는 경로는 `resources/preview.js`가 `data-vscode-context`에 실어 보내고 `webview/context` 메뉴가 받는 것뿐이다. 내장 프리뷰가 `acquireVsCodeApi()`를 이미 소비했고, 프리뷰 호스트는 `cacheImageSizes`·`revealLine`·`didClick`·`openLink`·`showPreviewSecuritySelector`·`previewStyleLoadError` 여섯 종류만 처리하며 외부 확장으로 중계하지 않는다. **선택이 바뀔 때 사이드바가 자동으로 알아차리게 만들 수는 없다.** 우클릭 한 번이 최소 동작이고, 그 뒤 앵커를 사이드바 작성 폼에 고정(`pinPreviewAnchor`)해서 본문을 거기서 쓰게 한다.
 - 새 기여점(`contributes`)을 추가하면 `apps/vscode/test/manifest.test.ts`에 검증을 같이 추가한다.
 
+## 에이전트 스킬
+
+`.agents/sideband-comments/` 에 스킬(`SKILL.md`)과 그 도구(`scripts/sideband_comments.py`)가 있다. 사용자 스코프에 링크해서 쓴다.
+
+```bash
+ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
+```
+
+사용법과 설계 배경은 [docs/agent-skill.ko.md](docs/agent-skill.ko.md) 에 있다. `scripts/` 의 테스트가 이 도구와 `packages/jsonl-store` 가 같은 저장소를 같게 읽고 쓰는지 검증한다 — 이벤트 스키마를 바꾸면 양쪽을 함께 고쳐야 한다.
+
 ## 작업 방식
 
 - 동작을 바꾸기 전에 실패하는 테스트를 먼저 쓴다.

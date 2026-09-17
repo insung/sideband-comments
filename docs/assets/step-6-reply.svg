@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 220" width="520" height="220" role="img" aria-label="A short reply hanging under the sticky note">
+  <style>
+    .bg{fill:#FFFFFF;stroke:#C9D6E6} .paper{fill:#FFFFFF;stroke:#C9D6E6} .line{fill:#D3DEEC}
+    .ink{fill:#1B2A3A} .soft{fill:#5A6B7D;stroke:#5A6B7D} .link{fill:#3F74C9;stroke:#3F74C9}
+    .note{fill:#FFC93C;stroke:#D99B00} .noteink{fill:#4A3800;opacity:.55}
+    .alarm{fill:#FF6B5A;stroke:#FF6B5A} .ok{fill:#2FB08C;stroke:#2FB08C}
+    text{font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px}
+    @media (prefers-color-scheme: dark) {
+      .bg{fill:#1B232E;stroke:#33404F} .paper{fill:#253040;stroke:#33404F} .line{fill:#3C4A5C}
+      .ink{fill:#E9EFF7} .soft{fill:#9FB0C4;stroke:#9FB0C4} .link{fill:#7BA6EF;stroke:#7BA6EF}
+      .note{fill:#FFC93C;stroke:#A87700} .noteink{fill:#3A2C00;opacity:.5}
+      .alarm{fill:#FF8575;stroke:#FF8575} .ok{fill:#4FD0AB;stroke:#4FD0AB}
+    }
+  </style>
+  <rect class="bg" x="1.5" y="1.5" width="517" height="217" rx="16" stroke-width="3"/>
+<rect class="note" x="56" y="34" width="126" height="92" rx="10" stroke-width="3"/><rect class="noteink" x="72" y="56" width="88" height="7" rx="3.5"/><rect class="noteink" x="72" y="74" width="74" height="7" rx="3.5"/><path class="soft" d="M119 126 L119 152" stroke-width="3" stroke-linecap="round"/><rect class="paper" x="220" y="60" width="240" height="104" rx="14" stroke-width="3"/><path class="paper" d="M244 60 L258 38 L272 60 Z" stroke-width="3" stroke-linejoin="round"/><rect class="link" x="246" y="88" width="186" height="8" rx="4" opacity=".75"/><rect class="link" x="246" y="112" width="140" height="8" rx="4" opacity=".75"/><rect class="link" x="246" y="136" width="92" height="8" rx="4" opacity=".55"/><text class="ink" x="56" y="176">two or three sentences</text></svg>
