@@ -380,18 +380,49 @@ def next_revision(store: Store, thread_id: str) -> int:
 
 
 def open_store(args) -> Store:
-    base = Path(args.root).resolve() if args.root else find_root(Path.cwd())
+    if not args.root:
+        raise CommentError("--root is required for reply and reanchor")
+    base = Path(args.root).resolve()
+    if not (base / ".comments").is_dir():
+        raise CommentError(f"{base} does not contain a .comments directory")
     return Store(base)
+
+
+def read_input(value: str | None, file_name: str | None, label: str) -> str:
+    if value is not None and file_name is not None:
+        raise CommentError(f"pass either {label} directly or --{label}-file, not both")
+    if file_name is not None:
+        if file_name == "-":
+            return sys.stdin.read()
+        try:
+            return Path(file_name).read_text(encoding="utf8")
+        except OSError as error:
+            raise CommentError(f"cannot read {label} file {file_name}: {error}") from error
+    if value is None:
+        raise CommentError(f"pass {label} directly or with --{label}-file")
+    return value
+
+
+def require_open_thread(thread: Thread) -> None:
+    if thread.deleted:
+        raise CommentError(f"thread {thread.id} is deleted")
+    if thread.status != "open":
+        raise CommentError(f"thread {thread.id} is {thread.status}; only open threads can be changed")
 
 
 def command_reply(args) -> int:
     store = open_store(args)
     thread = load_thread(store, args.thread)
-    body = args.body.strip()
+    require_open_thread(thread)
+    body = read_input(args.body, args.body_file, "body").strip()
     if not body:
         raise CommentError("comment body cannot be empty")
     state = anchor_state(store, thread)
-    if state == "orphaned":
+    if state != "resolved":
+        if state != "orphaned":
+            raise CommentError(
+                f"thread {thread.id} has anchor={state}; reply requires anchor=resolved"
+            )
         raise CommentError(
             f"thread {thread.id} is orphaned: the quoted text is no longer in {thread.document_path}.\n"
             f"  quoted: {thread.anchor['exact']!r}\n"
@@ -415,16 +446,20 @@ def command_reply(args) -> int:
 def command_reanchor(args) -> int:
     store = open_store(args)
     thread = load_thread(store, args.thread)
+    require_open_thread(thread)
     document = store.root / thread.document_path
     if not document.exists():
         raise CommentError(f"{thread.document_path} does not exist under {store.root}")
     text = document.read_text(encoding="utf8")
-    found = occurrences(text, args.exact)
+    exact = read_input(args.exact, args.exact_file, "exact")
+    if not exact:
+        raise CommentError("anchor exact text cannot be empty")
+    found = occurrences(text, exact)
     if not found:
-        raise CommentError(f"{args.exact!r} does not occur in {thread.document_path}")
+        raise CommentError(f"{exact!r} does not occur in {thread.document_path}")
     if len(found) > 1:
         raise CommentError(
-            f"{args.exact!r} occurs {len(found)} times in {thread.document_path}; "
+            f"{exact!r} occurs {len(found)} times in {thread.document_path}; "
             "pass a longer quote that occurs once"
         )
     store.append({
@@ -435,9 +470,9 @@ def command_reanchor(args) -> int:
         "occurredAt": now(),
         "actor": actor_from(args.author),
         "type": "thread.reanchored",
-        "anchor": capture_anchor(text, found[0], found[0] + len(args.exact)),
+        "anchor": capture_anchor(text, found[0], found[0] + len(exact)),
     })
-    print(f"Re-anchored {thread.id} to {args.exact!r} in {thread.document_path}.")
+    print(f"Re-anchored {thread.id} to {exact!r} in {thread.document_path}.")
     return 0
 
 
@@ -460,12 +495,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     reply = sub.add_parser("reply", help="add a comment to an existing thread")
     reply.add_argument("thread")
-    reply.add_argument("body")
+    reply.add_argument("body", nargs="?", help="reply text; prefer --body-file for shell-sensitive text")
+    reply.add_argument("--body-file", help="read reply text from a UTF-8 file, or '-' for stdin")
     reply.set_defaults(handler=command_reply)
 
     reanchor = sub.add_parser("reanchor", help="point an orphaned thread at the text that replaced it")
     reanchor.add_argument("thread")
-    reanchor.add_argument("--exact", required=True, help="text now in the document, occurring exactly once")
+    exact = reanchor.add_mutually_exclusive_group(required=True)
+    exact.add_argument("--exact", help="text now in the document, occurring exactly once")
+    exact.add_argument("--exact-file", help="read exact text from a UTF-8 file, or '-' for stdin")
     reanchor.set_defaults(handler=command_reanchor)
     return parser
 

@@ -77,15 +77,17 @@ For Obsidian, copy `main.js`, `manifest.json`, and `styles.css` from `apps/obsid
 
 ### AI agents
 
-`.agents/sideband-comments/` holds an agent skill, so you can ask Claude Code or another agent to read
-the comments on a file, fix what they ask for, and reply on the thread. Link it into your user scope:
+`.agents/sideband-comments/` holds an agent skill, so you can ask Claude Code or Codex to read the
+comments on a file, fix what they ask for, and reply on the thread. Link the same source into each
+agent's user scope:
 
 ```bash
 ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
+ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
 ```
 
-Codex, Copilot CLI, and Gemini CLI read `~/.agents/skills/` instead. The skill needs Python 3.9 or
-later and works on any project with a `.comments` directory.
+Copilot CLI and Gemini CLI can use `~/.agents/skills/` as a cross-runtime alias. The skill needs
+Python 3.9 or later and works on any project with a `.comments` directory.
 
 A comment is anchored to a quote of the document text, so editing that text orphans the thread — the
 skill re-anchors it before replying, and never resolves a thread on your behalf.

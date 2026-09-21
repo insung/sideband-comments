@@ -62,9 +62,9 @@ comment back on the text that replaced it**."
 | 5 · confirm | `list` once more; every thread should read `resolved` |
 | 6 · answer | `reply` adds the agent's comment to the thread |
 
-Steps 3–5 are the loop that keeps comments attached. `reply` refuses to run on an orphaned thread and
-prints the `reanchor` command to run first, so a forgotten re-anchor stops the work rather than
-quietly detaching your comment.
+Steps 3–5 are the loop that keeps comments attached. `reply` runs only for an open thread whose
+anchor is `resolved`; it refuses orphaned, ambiguous, missing-file, closed, and deleted threads. A
+forgotten re-anchor therefore stops the work rather than quietly detaching your comment.
 
 <img src="assets/step-5-reanchor.svg" alt="The note attached again to the new sentence" width="520">
 
@@ -90,13 +90,14 @@ It also will not create new threads, delete comments, or reopen resolved ones, f
 
 ## Install
 
-Link the skill directory into your agent's user scope:
+Link the same skill directory into each agent's user scope:
 
 ```bash
 ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
+ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
 ```
 
-Codex, Copilot CLI, and Gemini CLI read `~/.agents/skills/` instead:
+Copilot CLI and Gemini CLI can use the cross-runtime alias instead:
 
 ```bash
 ln -s "$PWD/.agents/sideband-comments" ~/.agents/skills/sideband-comments
@@ -116,6 +117,10 @@ You can run the same tool yourself:
 ```bash
 python3 .agents/sideband-comments/scripts/sideband_comments.py list docs/
 python3 .agents/sideband-comments/scripts/sideband_comments.py list --orphaned-only docs/
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex reply <thread-id> --body-file <reply-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex reanchor <thread-id> --exact-file <anchor-file>
 ```
 
 `list` reports each thread's anchor state:
@@ -125,6 +130,14 @@ python3 .agents/sideband-comments/scripts/sideband_comments.py list --orphaned-o
 | `resolved` | The quote is in the document; the comment points at it |
 | `ambiguous` | The quote occurs several times and the surrounding context cannot separate them |
 | `orphaned` | The quote is gone — an edit removed or rewrote it |
+| `missing-file` | The document no longer exists at the stored path |
+
+Anchor state and thread status are separate: `anchor=resolved` means attached, while thread status
+reports whether the reader has left the review `open` or marked it `resolved`.
+
+Write commands require `--root`. Use `--body-file` and `--exact-file` for generated text so shell
+quotes, backticks, and substitutions cannot change or execute comment content. Both options accept
+`-` for stdin.
 
 Run the tool with `--help` for the rest.
 

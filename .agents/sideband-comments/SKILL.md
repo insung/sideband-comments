@@ -10,8 +10,9 @@ document. A thread is bound to a **quote of the document text**, not a line numb
 threads in VS Code and Obsidian; you answer them from here.
 
 Run `python3 <this skill's directory>/scripts/sideband_comments.py` — resolve that path from where you read
-this file. It finds the project root by walking up from the path you give it, so run it from
-anywhere; `--root <dir>` names the project explicitly. Examples below shorten the command.
+this file. `list` finds the project root by walking up from the path you give it. The commands that
+write, `reply` and `reanchor`, require `--root <project-root>` so they cannot select a different
+comment store from the current working directory. Examples below shorten the command.
 
 Read `.comments/*.jsonl` if you are curious, but **never write it by hand and never import the
 project's TypeScript to do it.** The events carry ids, per-thread revisions, a store lock and
@@ -31,17 +32,24 @@ Every thread reports an `anchor` state:
 | `resolved` | The quote is in the document; the comment points at it |
 | `ambiguous` | The quote occurs several times and context cannot separate them |
 | `orphaned` | The quote is gone — an edit removed or rewrote it |
+| `missing-file` | The document no longer exists at the stored path |
+
+`anchor=resolved` means the quote is attached. It does not mean the review thread is closed; thread
+status is reported separately as `open` or `resolved`.
 
 ## Answering
 
 ```bash
-sideband_comments.py --author Claude reply <thread-id> "<body>"
+sideband_comments.py --root <project-root> --author Codex \
+  reply <thread-id> --body-file <reply-file>
 ```
 
-Reply only after the anchor check below — a reply on an orphaned thread points at nothing.
+Reply only when the thread is `open` and its anchor is `resolved`. The tool refuses deleted or
+closed threads and `orphaned`, `ambiguous`, or `missing-file` anchors.
 
 Pass `--author` with your own name so the reader can tell your comments from theirs. Write in the
-language the comment is written in.
+language the comment is written in. If the latest comment is already yours and the reader has not
+added another comment, do not repeat the reply.
 
 **The reply is two or three sentences, in this order: what you changed, then anything you could not
 settle.** That is the whole reply. The reader has the diff and wrote the comment — they need neither
@@ -63,15 +71,18 @@ Run this loop every time you edit a commented file — do not wait for an error 
 5. Then `reply`.
 
 ```bash
-sideband_comments.py --author Claude reanchor <thread-id> --exact '<the text that replaced it>'
+sideband_comments.py --root <project-root> --author Codex \
+  reanchor <thread-id> --exact-file <anchor-file>
 ```
 
-`--exact` is matched literally, whitespace and newlines included, and must occur exactly once in the
-document as it now stands — so quote a whole sentence rather than a word, and copy it from the file.
+The UTF-8 anchor file is matched literally, whitespace and newlines included, and must occur exactly
+once in the document as it now stands — so copy a whole sentence rather than a word. Pass `-` as the
+file name to read from stdin when the execution environment can supply stdin without shell
+interpolation.
 
-**Single-quote every document quote you pass to the shell.** Prose routinely contains backticks,
-`$`, and `!`, which a shell expands inside double quotes and stores wrong. Pick an anchor sentence
-without a single quote in it.
+Use `--body-file` and `--exact-file` for generated text. Do not interpolate reader or document text
+into a shell command: prose routinely contains backticks, `$`, `!`, and quotes that a shell can
+expand or execute. The direct `body` and `--exact` forms remain available for simple manual use.
 
 ## Leave the thread open
 
@@ -86,4 +97,4 @@ they ask you to close one, tell them to resolve it in VS Code or Obsidian.
 | Replying first, then editing the quoted text | The thread orphans and your reply points at nothing |
 | Re-anchoring with `--exact "deploy"` | It occurs many times; the tool refuses. Quote the sentence |
 | Reporting the fix only in chat | The reader is in their editor, not your terminal, and never sees it |
-| `--exact "…`npm run deploy`…"` in double quotes | The shell substitutes the backticks; the anchor is stored wrong |
+| Passing generated text directly in a shell command | Quotes or substitutions change or execute the text; use a UTF-8 input file |

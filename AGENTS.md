@@ -162,10 +162,11 @@ Obsidian은 플러그인을 **`https://github.com/insung/sideband-comments/relea
 
 ## 에이전트 스킬
 
-`.agents/sideband-comments/` 에 스킬(`SKILL.md`)과 그 도구(`scripts/sideband_comments.py`)가 있다. 사용자 스코프에 링크해서 쓴다.
+`.agents/sideband-comments/` 에 스킬(`SKILL.md`)과 그 도구(`scripts/sideband_comments.py`)가 있다. 각 에이전트의 사용자 스코프에 링크해서 쓴다.
 
 ```bash
 ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
+ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
 ```
 
 사용법과 설계 배경은 [docs/agent-skill.ko.md](docs/agent-skill.ko.md) 에 있다. `scripts/` 의 테스트가 이 도구와 `packages/jsonl-store` 가 같은 저장소를 같게 읽고 쓰는지 검증한다 — 이벤트 스키마를 바꾸면 양쪽을 함께 고쳐야 한다.

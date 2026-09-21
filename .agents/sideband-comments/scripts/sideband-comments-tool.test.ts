@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -30,14 +30,19 @@ interface Store {
   readonly document: string;
   readonly threadId: string;
   readonly repository: JsonlThreadRepository;
+  readonly service: CommentService;
 }
 
 /** Seeds a store the way the editors do, so the tool is read against real editor output. */
-async function seed(): Promise<Store> {
+async function seedThread(
+  documentText: string,
+  anchor: ReturnType<typeof captureAnchor>,
+  body = "Is there really no approval step before production?"
+): Promise<Store> {
   const root = await mkdtemp(join(tmpdir(), "sideband-agent-"));
   await mkdir(join(root, "docs"), { recursive: true });
   const document = join(root, "docs/guide.md");
-  await writeFile(document, guide, "utf8");
+  await writeFile(document, documentText, "utf8");
 
   const repository = new JsonlThreadRepository(root);
   let counter = 0;
@@ -48,11 +53,16 @@ async function seed(): Promise<Store> {
   });
   const thread = await service.create({
     documentPath: "docs/guide.md",
-    anchor: captureAnchor(guide, guide.indexOf(QUOTE), guide.indexOf(QUOTE) + QUOTE.length),
-    body: "Is there really no approval step before production?"
+    anchor,
+    body
   });
-  return { root, document, threadId: thread.id, repository };
+  return { root, document, threadId: thread.id, repository, service };
 }
+
+const seed = () => seedThread(
+  guide,
+  captureAnchor(guide, guide.indexOf(QUOTE), guide.indexOf(QUOTE) + QUOTE.length)
+);
 
 const tell = (store: Store, ...args: string[]) =>
   run("python3", [tool, "--root", store.root, "--author", "Claude", ...args]);
@@ -145,5 +155,104 @@ describe("sideband_comments.py against the editors' store", () => {
     const subcommands = [...help.matchAll(/sub\.add_parser\("([a-z-]+)"/g)].map((match) => match[1]);
 
     expect(subcommands.sort()).toEqual(["list", "reanchor", "reply"]);
+  });
+});
+
+describe("sideband_comments.py write guards", () => {
+  it("requires an explicit root before replying", async () => {
+    const store = await seed();
+
+    await expect(run("python3", [tool, "--author", "Claude", "reply", store.threadId, "Documented it."], {
+      cwd: store.root
+    })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("--root")
+    });
+  });
+
+  it("requires an explicit root before re-anchoring", async () => {
+    const store = await seed();
+
+    await expect(run("python3", [tool, "--author", "Claude", "reanchor", store.threadId, "--exact", QUOTE], {
+      cwd: store.root
+    })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("--root")
+    });
+  });
+
+  it("refuses to reply when the anchor is ambiguous", async () => {
+    const text = "same--same";
+    const store = await seedThread(text, { exact: "same", prefix: "", suffix: "", position: 3 });
+
+    await expect(tell(store, "reply", store.threadId, "Documented it.")).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("ambiguous")
+    });
+  });
+
+  it("refuses to reply when the document is missing", async () => {
+    const store = await seed();
+    await unlink(store.document);
+
+    await expect(tell(store, "reply", store.threadId, "Documented it.")).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("missing-file")
+    });
+  });
+
+  it("refuses to reply to a resolved thread", async () => {
+    const store = await seed();
+    await store.service.resolve(store.threadId);
+
+    await expect(tell(store, "reply", store.threadId, "Documented it.")).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("resolved")
+    });
+  });
+
+  it("refuses to reply to a deleted thread", async () => {
+    const store = await seed();
+    await store.service.delete(store.threadId);
+
+    await expect(tell(store, "reply", store.threadId, "Documented it.")).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("deleted")
+    });
+  });
+
+  it("reads a reply body from a file without changing shell-sensitive text", async () => {
+    const store = await seed();
+    const body = "Ran `npm run deploy` with $HOME and 'single quotes'.\nNothing was expanded.";
+    const bodyFile = join(store.root, "reply.txt");
+    await writeFile(bodyFile, body, "utf8");
+
+    await tell(store, "reply", store.threadId, "--body-file", bodyFile);
+
+    const thread = await store.repository.read(store.threadId);
+    expect(thread?.comments.at(-1)?.body).toBe(body);
+  });
+
+  it("reads an exact replacement anchor from a file", async () => {
+    const store = await seed();
+    const replacement = "Use `$HOME` only after the operator's approval.";
+    const exactFile = join(store.root, "anchor.txt");
+    await writeFile(store.document, guide.replace(QUOTE, replacement), "utf8");
+    await writeFile(exactFile, replacement, "utf8");
+
+    await tell(store, "reanchor", store.threadId, "--exact-file", exactFile);
+
+    const thread = await store.repository.read(store.threadId);
+    expect(thread?.anchor.exact).toBe(replacement);
+  });
+
+  it("refuses to re-anchor a resolved thread", async () => {
+    const store = await seed();
+    await store.service.resolve(store.threadId);
+
+    await expect(tell(store, "reanchor", store.threadId, "--exact", QUOTE)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("resolved")
+    });
   });
 });

@@ -3,6 +3,17 @@
 Release notes for the Sideband Comments extension for VS Code. Notes for the Obsidian plugin
 are published with each [GitHub release](https://github.com/insung/sideband-comments/releases).
 
+## 1.0.7
+
+### Fixed
+
+- Keep agent replies in the selected project by requiring its root, and refuse replies when the review thread is closed or its quoted text is ambiguous, detached, or missing.
+- Read agent reply and re-anchor text from UTF-8 files or standard input, so shell syntax in review text is stored literally instead of being expanded.
+
+### Verification
+
+- Typecheck and 114 tests passed.
+
 ## 1.0.6
 
 ### Fixed

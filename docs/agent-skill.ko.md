@@ -48,7 +48,7 @@ Sideband Comments는 리뷰 코멘트를 문서 **안**이 아니라 **옆**에 
 | 5 · 재확인 | `list` 한 번 더, 모든 스레드가 `resolved` 여야 합니다 |
 | 6 · 답하기 | `reply` 로 스레드에 답글을 답니다 |
 
-3~5번이 코멘트를 붙어 있게 하는 고리입니다. `reply` 는 orphaned 상태의 스레드에서 **실행을 거부하고** 먼저 칠 `reanchor` 명령을 알려줍니다. re-anchor를 잊으면 작업이 멈추지, 코멘트가 조용히 떨어지지는 않습니다.
+3~5번이 코멘트를 붙어 있게 하는 고리입니다. `reply` 는 열린 스레드의 앵커가 `resolved`일 때만 실행됩니다. orphaned, ambiguous, missing-file, 해결됨, 삭제됨 상태에서는 실행을 거부하므로 re-anchor를 잊으면 작업이 멈추지, 코멘트가 조용히 떨어지지는 않습니다.
 
 <img src="assets/step-5-reanchor.svg" alt="새 문장에 다시 붙은 쪽지" width="520">
 
@@ -68,13 +68,14 @@ Sideband Comments는 리뷰 코멘트를 문서 **안**이 아니라 **옆**에 
 
 ## 설치
 
-스킬 디렉터리를 사용자 스코프에 링크합니다.
+같은 스킬 디렉터리를 각 에이전트의 사용자 스코프에 링크합니다.
 
 ```bash
 ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
+ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
 ```
 
-Codex, Copilot CLI, Gemini CLI는 `~/.agents/skills/` 를 읽습니다.
+Copilot CLI와 Gemini CLI는 공용 별칭을 사용할 수 있습니다.
 
 ```bash
 ln -s "$PWD/.agents/sideband-comments" ~/.agents/skills/sideband-comments
@@ -93,6 +94,10 @@ Python 3.9 이상이 필요한데, macOS와 대부분의 리눅스에는 이미 
 ```bash
 python3 .agents/sideband-comments/scripts/sideband_comments.py list docs/
 python3 .agents/sideband-comments/scripts/sideband_comments.py list --orphaned-only docs/
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex reply <thread-id> --body-file <reply-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex reanchor <thread-id> --exact-file <anchor-file>
 ```
 
 `list` 는 각 스레드의 앵커 상태를 보여줍니다.
@@ -102,6 +107,11 @@ python3 .agents/sideband-comments/scripts/sideband_comments.py list --orphaned-o
 | `resolved` | 인용문이 문서에 있고, 코멘트가 그곳을 가리킵니다 |
 | `ambiguous` | 인용문이 여러 번 나오는데 앞뒤 문맥으로도 구분되지 않습니다 |
 | `orphaned` | 인용문이 사라졌습니다 — 편집이 지웠거나 고쳐 썼습니다 |
+| `missing-file` | 저장된 경로에 문서가 더는 없습니다 |
+
+앵커 상태와 스레드 상태는 별개입니다. `anchor=resolved`는 코멘트가 문장에 붙어 있다는 뜻이고, 스레드 상태의 `open`과 `resolved`는 사용자가 검토를 열어 두었는지 해결했는지를 뜻합니다.
+
+쓰기 명령에는 `--root`가 필요합니다. 생성한 본문과 앵커는 `--body-file`, `--exact-file`로 전달해 셸의 따옴표, 백틱, 명령 치환이 내용을 바꾸거나 실행하지 못하게 합니다. 두 옵션 모두 stdin을 뜻하는 `-`를 받을 수 있습니다.
 
 나머지는 `--help` 로 볼 수 있습니다.
 
