@@ -32,11 +32,11 @@ git status --porcelain
 
 에이전트가 반복 수정하며 가장 쉽게 어기는 규칙이고, 실제로 어겨서 사고가 났다.
 
-### 버전은 publish 할 때만 올린다
+### 버전은 릴리스 주기에 한 번만 올린다
 
-로컬에서 재현·검증하려고 `.vsix`를 만들 때 **버전을 올리지 않는다.** 같은 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
+한 변경의 릴리즈 노트를 쓸 때 다음 버전으로 **한 번** 올리고, 그 버전으로 `.vsix`를 만들어 로컬에서 검증한다. 검증을 되풀이해도 **다시 올리지 않는다.** 같은 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
 
-버전 번호는 마켓플레이스에 올라간 것의 다음 번호이지, 로컬 빌드 횟수가 아니다. 프리뷰 결함을 고치는 동안 검증 빌드마다 1.0.6 → 1.0.7 → 1.0.8로 올려놨는데 마켓플레이스는 계속 1.0.5였고, 결국 1.0.6으로 되돌려야 했다. 버전을 올리는 시점은 **publish 직전 한 번**뿐이다.
+버전 번호는 마켓플레이스에 올라간 것의 다음 번호이지, 로컬 빌드 횟수가 아니다. 프리뷰 결함을 고치는 동안 검증 빌드마다 1.0.6 → 1.0.7 → 1.0.8로 올려놨는데 마켓플레이스는 계속 1.0.5였고, 결국 1.0.6으로 되돌려야 했다. 올리는 시점은 릴리즈 노트를 쓰는 **그 한 번**뿐이다.
 
 로컬 재설치 시 주의: 더 높은 버전의 확장 디렉터리가 `~/.vscode/extensions/`에 남아 있으면 VS Code는 그쪽을 로드한다. 낮은 버전을 `--force`로 설치해도 소용없다.
 
@@ -63,9 +63,19 @@ VS Code 확장은 **Visual Studio Marketplace에 publish 하는 것이 배포다
 npm run typecheck && npm test && npm run build
 ```
 
-### 2. 로컬 확인
+### 2. 버전 올리기와 릴리즈 노트 — 릴리스 주기에 한 번
 
-현재 버전 그대로 패키징한다. **여기서 버전을 올리지 않는다.**
+마켓플레이스의 현재 버전을 먼저 확인하고, 그 다음 번호로 올린다. `apps/vscode/package.json`의 `version`과 `scripts.package`의 `.vsix` 파일명을 **함께** 올린다. 둘이 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
+
+VS Code와 Obsidian은 `major.minor`를 공유해야 한다. 패치 번호는 각자 올려도 된다.
+
+```bash
+npm run check:app-versions
+```
+
+### 3. 로컬 확인
+
+올린 새 버전으로 패키징해 설치한다. 검증을 되풀이해도 버전은 그대로 둔다.
 
 ```bash
 npm run package --workspace apps/vscode
@@ -73,18 +83,7 @@ code --uninstall-extension insung.sideband-comments-vscode
 code --install-extension apps/vscode/dist/sideband-comments-vscode-<version>.vsix --force
 ```
 
-설치 후 VS Code를 재시작하거나 `Developer: Reload Window`를 실행해야 새 번들이 뜬다. 사용자가 동작을 확인하면 커밋하고 다음 단계로 간다.
-
-### 3. 버전 올리기 — publish 직전에 한 번
-
-마켓플레이스의 현재 버전을 먼저 확인하고, 그 다음 번호로 올린다. `apps/vscode/package.json`의 `version`과 `scripts.package`의 `.vsix` 파일명을 **함께** 올린다. 둘이 다르면 `check-app-version-line.mjs`가 막는다.
-
-VS Code와 Obsidian은 `major.minor`를 공유해야 한다. 패치 번호는 각자 올려도 된다.
-
-```bash
-npm run check:app-versions
-npm run package --workspace apps/vscode
-```
+설치 후 VS Code를 재시작하거나 `Developer: Reload Window`를 실행해야 새 번들이 뜬다. 사용자가 동작을 확인하면 커밋하고 다음 단계로 간다. 사용자가 직접 확인하는 순서는 아래 「로컬에서 시험하기」에 있다.
 
 ### 4. 릴리즈 노트
 
@@ -99,7 +98,7 @@ npm run package --workspace apps/vscode
 - `Fixed` 에는 무엇이 잘못됐었는지가 드러나야 한다. "Fix preview bug" 가 아니라 무엇이 안 되다가 되는지 쓴다.
 - `### Verification` 에는 **실제로 통과한 것만** 적는다. 사용자가 확인하지 않은 동작을 확인했다고 쓰지 않는다.
 
-릴리즈 노트는 버전을 올리는 시점, 즉 publish 직전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다.
+릴리즈 노트는 버전을 올리는 시점, 즉 로컬 검증 전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다. `### Verification` 은 로컬 검증이 끝난 뒤 실제 결과로 채운다.
 
 ### 5. publish
 
@@ -118,6 +117,63 @@ git tag vscode-<version> && git push origin vscode-<version>
 ```
 
 **VS Code 릴리즈로 GitHub Release를 만들지 않는다.** 태그만 남긴다. 이유는 아래 "릴리즈 공간 공유" 참고.
+
+## 로컬에서 시험하기
+
+사용자가 배포 전에 두 편집기와 에이전트 도구를 직접 확인하는 순서다. 편집기 코드가 바뀌지 않은 변경(예: 에이전트 도구만 고친 경우)도 같은 순서로 확인한다. 도구가 쓰는 이벤트가 편집기가 접는 이벤트와 같아야 하기 때문이다.
+
+### 1. 자동 검증
+
+```bash
+npm run typecheck && npm test
+```
+
+### 2. 연습용 프로젝트
+
+실제 문서 저장소에 쓰기 전에 연습용 프로젝트에서 한다. `.comments/` 는 append-only 라 잘못 만든 스레드는 편집기에서 숨길 수만 있다. Obsidian 은 볼트 루트의 `.comments` 만 읽으므로 이 폴더를 그대로 볼트로 연다.
+
+```bash
+T=~/sideband-try && mkdir -p "$T/docs" "$T/.comments" && printf '# 배포 안내\n\n## 릴리스 실행\n\n`npm run deploy` 를 실행하면 파이프라인이 즉시 운영에 배포한다.\n\n## 롤백\n\n온콜 담당자에게 연락한다.\n' > "$T/docs/guide.md"
+```
+
+### 3. VS Code — 새 버전 `.vsix` 를 만들어 설치
+
+위 「VS Code 배포」 2번에서 올린 버전으로 패키징한다. `~/.vscode/extensions/` 에 더 높은 버전이 남아 있으면 그쪽이 로드되므로 먼저 지운다.
+
+```bash
+npm run package --workspace apps/vscode
+code --uninstall-extension insung.sideband-comments-vscode
+code --install-extension apps/vscode/dist/sideband-comments-vscode-<version>.vsix --force
+code ~/sideband-try
+```
+
+`Developer: Reload Window` 뒤 확장 보기에서 버전이 새 번호인지 본다. 확장은 `.comments/{threads,documents}/*.jsonl` 을 감시하므로 도구가 만든 스레드는 새로 고침 없이 Comments Explorer 에 나타난다.
+
+### 4. Obsidian — 빌드 결과를 플러그인 폴더에 복사
+
+Obsidian 은 `<vault>/.obsidian/plugins/sideband-comments/` 의 `main.js`, `manifest.json`, `styles.css` 를 읽는다. 빌드한 세 파일을 그 자리에 복사하면 그것이 설치다. 복사만으로는 다시 읽지 않으므로, 설정 → 커뮤니티 플러그인에서 Sideband Comments 를 **끄고 다시 켠다** (또는 Obsidian 재시작).
+
+```bash
+npm run package --workspace apps/obsidian
+mkdir -p ~/sideband-try/.obsidian/plugins/sideband-comments
+cp apps/obsidian/dist/main.js apps/obsidian/dist/manifest.json apps/obsidian/dist/styles.css ~/sideband-try/.obsidian/plugins/sideband-comments/
+```
+
+Obsidian 버전은 플러그인 코드가 바뀐 릴리스에서만 올린다. 커뮤니티 스토어 버전과 폴더의 `manifest.json` 버전이 같으면 스토어가 덮어쓰지 않는다. 플러그인의 파일 감시는 `threads/` 만 보고, 창 포커스·노트 열기 때 다시 읽는다. 터미널에서 도구를 실행한 뒤 Obsidian 창을 클릭하면 새 스레드가 보인다.
+
+### 5. 에이전트 도구와 편집기 교차 확인
+
+```bash
+TOOL=.agents/sideband-comments/scripts/sideband_comments.py
+printf '[unclear-wording] CLEAR-001\n\n「즉시」가 어느 시점인지 알 수 없다.\n' > /tmp/body.txt
+python3 $TOOL --root ~/sideband-try --author "MI Delivery Harness" create docs/guide.md --line 5 --body-file /tmp/body.txt
+python3 $TOOL list ~/sideband-try/docs/guide.md
+```
+
+1. 두 편집기에서 5번 줄 하이라이트와 「MI Delivery Harness」 스레드를 확인한다.
+2. 편집기에서 답글을 달고 `list` 를 다시 실행한다. 답글이 두 번째 코멘트로 보여야 한다.
+3. 편집기에서 해결 처리하고 `list` 를 실행한다. `[resolved]` 로 바뀌고, 도구의 `reply` 는 거부되어야 한다.
+4. 일괄 생성은 `create --batch-file <요청.json> --json` 으로 확인한다. 항목 하나를 빈 줄로 가리키면 전체가 거부되고 `.comments/documents/` 에 새 파일이 생기지 않아야 한다.
 
 ## 릴리즈 공간 공유 — 가장 중요한 제약
 

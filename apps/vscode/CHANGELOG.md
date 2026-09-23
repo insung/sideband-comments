@@ -3,6 +3,19 @@
 Release notes for the Sideband Comments extension for VS Code. Notes for the Obsidian plugin
 are published with each [GitHub release](https://github.com/insung/sideband-comments/releases).
 
+## 1.0.8
+
+### Added
+
+- Start a review thread from the agent tool with `create`, quoting a line (`--line 12`), a line range (`--line 12-14`), or an exact text read from a file, so an agent can leave its review as comments instead of editing the document.
+- Create several threads in one run from a JSON batch file; every request is checked before anything is written, and one failing request creates no thread at all.
+- Store threads the tool creates in the document's existing bundle, exactly where the editors would put them, instead of starting a new file per thread.
+- Refuse a quote whose surrounding text cannot tell it apart from an identical passage, so a later edit above it cannot move the thread to the wrong place.
+
+### Verification
+
+- Typecheck and 128 tests passed.
+
 ## 1.0.7
 
 ### Fixed
