@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -154,7 +154,7 @@ describe("sideband_comments.py against the editors' store", () => {
     const help = await readFile(tool, "utf8");
     const subcommands = [...help.matchAll(/sub\.add_parser\("([a-z-]+)"/g)].map((match) => match[1]);
 
-    expect(subcommands.sort()).toEqual(["list", "reanchor", "reply"]);
+    expect(subcommands.sort()).toEqual(["create", "list", "reanchor", "reply"]);
   });
 });
 
@@ -253,6 +253,202 @@ describe("sideband_comments.py write guards", () => {
     await expect(tell(store, "reanchor", store.threadId, "--exact", QUOTE)).rejects.toMatchObject({
       code: 1,
       stderr: expect.stringContaining("resolved")
+    });
+  });
+});
+
+/** A project that has adopted Sideband Comments but holds no thread on the document yet. */
+async function emptyStore(documentText = guide): Promise<Omit<Store, "threadId" | "service">> {
+  const root = await mkdtemp(join(tmpdir(), "sideband-create-"));
+  await mkdir(join(root, "docs"), { recursive: true });
+  await mkdir(join(root, ".comments"), { recursive: true });
+  const document = join(root, "docs/guide.md");
+  await writeFile(document, documentText, "utf8");
+  return { root, document, repository: new JsonlThreadRepository(root) };
+}
+
+const createTell = (root: string, ...args: string[]) =>
+  run("python3", [tool, "--root", root, "--author", "MI Delivery Harness", ...args]);
+
+async function bodyFile(root: string, name: string, text: string): Promise<string> {
+  const file = join(root, name);
+  await writeFile(file, text, "utf8");
+  return file;
+}
+
+describe("sideband_comments.py create", () => {
+  it("creates a thread on a line and the editors fold it", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "[unclear-wording] CLEAR-001\n\n「immediately」가 어느 시점인지 알 수 없다.");
+
+    const { stdout } = await createTell(store.root, "create", "docs/guide.md", "--line", "5", "--body-file", body, "--json");
+    const [created] = JSON.parse(stdout);
+
+    const thread = await store.repository.read(created.threadId);
+    expect(created).toMatchObject({ documentPath: "docs/guide.md", quoted: QUOTE });
+    expect(thread?.anchor.exact).toBe(QUOTE);
+    expect(thread?.status).toBe("open");
+    expect(thread?.comments).toHaveLength(1);
+    expect(thread?.comments[0]?.author).toEqual({ id: "mi-delivery-harness", name: "MI Delivery Harness" });
+    expect(thread?.comments[0]?.body).toBe("[unclear-wording] CLEAR-001\n\n「immediately」가 어느 시점인지 알 수 없다.");
+  });
+
+  it("lists the created thread as resolved and accepts a reply on it", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Which step approves the release?");
+    const { stdout } = await createTell(store.root, "create", "docs/guide.md", "--line", "5", "--body-file", body, "--json");
+    const [created] = JSON.parse(stdout);
+
+    const listed = JSON.parse((await createTell(store.root, "list", "--json", store.document)).stdout);
+    expect(listed).toEqual([expect.objectContaining({ id: created.threadId, anchor: "resolved", status: "open" })]);
+
+    await createTell(store.root, "reply", created.threadId, "The approval step is documented now.");
+    const thread = await store.repository.read(created.threadId);
+    expect(thread?.comments.map((comment) => comment.body)).toEqual([
+      "Which step approves the release?",
+      "The approval step is documented now."
+    ]);
+  });
+
+  it("a second thread on the same document joins the existing bundle", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Note.");
+    await createTell(store.root, "create", "docs/guide.md", "--line", "5", "--body-file", body);
+    await createTell(store.root, "create", "docs/guide.md", "--line", "9", "--body-file", body);
+
+    expect(await store.repository.listByDocument("docs/guide.md")).toHaveLength(2);
+    expect(await readdir(join(store.root, ".comments/documents"))).toHaveLength(1);
+  });
+
+  it("quotes a line range as one anchor, trimmed of surrounding whitespace", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "The heading and the step disagree.");
+    const { stdout } = await createTell(store.root, "create", "docs/guide.md", "--line", "3-5", "--body-file", body, "--json");
+    const [created] = JSON.parse(stdout);
+
+    const thread = await store.repository.read(created.threadId);
+    expect(thread?.anchor.exact).toBe(`## Running a release\n\n${QUOTE}`);
+  });
+
+  it("quotes a sentence inside a line from --exact-file", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Immediately?");
+    const exact = await bodyFile(store.root, "exact.txt", "pushes to production immediately");
+    const { stdout } = await createTell(store.root, "create", "docs/guide.md", "--exact-file", exact, "--body-file", body, "--json");
+    const [created] = JSON.parse(stdout);
+
+    const thread = await store.repository.read(created.threadId);
+    expect(thread?.anchor.exact).toBe("pushes to production immediately");
+  });
+
+  it("creates several threads from a batch file in one pass and reports their ids as JSON", async () => {
+    const store = await emptyStore();
+    const batch = await bodyFile(store.root, "batch.json", JSON.stringify([
+      { path: "docs/guide.md", line: 5, body: "[unclear-wording] CLEAR-001\n\nWhen is immediately?" },
+      { path: "docs/guide.md", line: { start: 7, end: 9 }, body: "[undefined-term] CLEAR-002\n\nWho is on call?" },
+      { path: "docs/guide.md", exact: "Deployment Guide", body: "[missing-subject-object-action] CLEAR-003\n\nDeploy what?" }
+    ]));
+
+    const { stdout } = await createTell(store.root, "create", "--batch-file", batch, "--json");
+    const created = JSON.parse(stdout);
+
+    expect(created.map((item: { index: number; quoted: string }) => [item.index, item.quoted])).toEqual([
+      [0, QUOTE],
+      [1, "## Rollback\n\nContact the on-call engineer."],
+      [2, "Deployment Guide"]
+    ]);
+    expect(await store.repository.listByDocument("docs/guide.md")).toHaveLength(3);
+    expect(await readdir(join(store.root, ".comments/documents"))).toHaveLength(1);
+  });
+
+  it("writes nothing when one batch item fails, and names the failing item", async () => {
+    const store = await emptyStore();
+    const batch = await bodyFile(store.root, "batch.json", JSON.stringify([
+      { path: "docs/guide.md", line: 5, body: "Fine." },
+      { path: "docs/guide.md", line: 40, body: "Beyond the end." }
+    ]));
+
+    await expect(createTell(store.root, "create", "--batch-file", batch)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("[1]")
+    });
+    expect(await store.repository.list()).toHaveLength(0);
+  });
+
+  it("refuses a blank line", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Nothing here.");
+
+    await expect(createTell(store.root, "create", "docs/guide.md", "--line", "4", "--body-file", body)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("blank")
+    });
+  });
+
+  it("refuses a line outside the document", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Nothing here.");
+
+    await expect(createTell(store.root, "create", "docs/guide.md", "--line", "40", "--body-file", body)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("outside")
+    });
+  });
+
+  it("refuses a line whose surrounding context does not separate it from a twin", async () => {
+    const pad = `${"=".repeat(40)}\n`;
+    const block = "alpha\nsame line here\nomega\n";
+    const store = await emptyStore(`${pad}${block}${pad}${block}${pad}`);
+    const body = await bodyFile(store.root, "body.txt", "Which one?");
+
+    await expect(createTell(store.root, "create", "docs/guide.md", "--line", "3", "--body-file", body)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("ambiguous")
+    });
+    expect(await store.repository.list()).toHaveLength(0);
+  });
+
+  it("refuses an --exact quote that occurs more than once", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Which one?");
+
+    await expect(createTell(store.root, "create", "docs/guide.md", "--exact", "the", "--body-file", body)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("occurs 2 times")
+    });
+  });
+
+  it("refuses an empty body", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "   \n");
+
+    await expect(createTell(store.root, "create", "docs/guide.md", "--line", "5", "--body-file", body)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("empty")
+    });
+  });
+
+  it("refuses a document outside the project root", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "Elsewhere.");
+    const outside = await mkdtemp(join(tmpdir(), "sideband-outside-"));
+    await writeFile(join(outside, "other.md"), guide, "utf8");
+
+    await expect(createTell(store.root, "create", join(outside, "other.md"), "--line", "5", "--body-file", body)).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("inside")
+    });
+  });
+
+  it("requires an explicit root before creating", async () => {
+    const store = await emptyStore();
+    const body = await bodyFile(store.root, "body.txt", "No root.");
+
+    await expect(run("python3", [tool, "--author", "Claude", "create", "docs/guide.md", "--line", "5", "--body-file", body], {
+      cwd: store.root
+    })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("--root")
     });
   });
 });

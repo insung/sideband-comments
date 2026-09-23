@@ -15,7 +15,7 @@ Sideband Comments는 리뷰 코멘트를 문서 **안**이 아니라 **옆**에 
 
 파일을 읽을 수 있는 AI라고 해서 코멘트 저장소를 안전하게 쓸 수 있는 건 아닙니다. 이벤트에는 id, 스레드별 revision, 저장소 잠금, 그리고 앞서 말한 인용 앵커가 들어갑니다. 손으로 쓴 JSONL은 스레드를 망가뜨리고, 에디터는 그걸 읽기를 거부합니다.
 
-그래서 스킬은 AI에게 도구를 쥐여 줍니다. "이 파일 코멘트 확인하고 고쳐줘"라고 말하면, 고쳐진 문서와 당신이 남긴 스레드에 달린 답글이 돌아옵니다.
+그래서 스킬은 AI에게 도구를 쥐여 줍니다. "이 파일 코멘트 확인하고 고쳐줘"라고 말하면, 고쳐진 문서와 당신이 남긴 스레드에 달린 답글이 돌아옵니다. 반대 방향도 됩니다. "이 파일 검수하고 코멘트로 남겨줘"라고 하면 파일은 한 글자도 바꾸지 않고, 문제가 있는 문장마다 스레드가 생깁니다.
 
 <img src="assets/step-2-read.svg" alt="쪽지를 읽는 AI" width="520">
 
@@ -64,7 +64,9 @@ Sideband Comments는 리뷰 코멘트를 문서 **안**이 아니라 **옆**에 
 
 **스레드를 해결(resolve) 처리하지 않습니다.** 코멘트가 답변됐다고 정하는 건 그 코멘트를 쓴 사람의 몫이라, 도구에 **`resolve` 명령 자체를 만들지 않았습니다.** 모델이 읽고 넘길 수 있는 문장이 아니라 도구의 표면으로 막았습니다. 해결 처리는 VS Code나 Obsidian에서 직접 하세요.
 
-같은 이유로 새 스레드 생성, 코멘트 삭제, 해결된 스레드 되돌리기도 하지 않습니다.
+같은 이유로 코멘트 삭제와 해결된 스레드 되돌리기도 하지 않습니다.
+
+새 스레드는 **만들 수 있습니다** — `create` 명령입니다. 다만 당신이 검수 결과를 코멘트로 남기라고 했을 때, 또는 검수 하네스가 최종 finding 을 넘겼을 때만입니다. 자기가 곧 고칠 문장에는 만들지 않고, 재검수가 남아 있을 때도 만들지 않습니다. 그 스레드가 다음 검수자의 입력이 되어 되풀이되기 때문입니다. 스레드의 작성자는 도구를 실행한 쪽(`--author`)이지, 저장소를 건드린 적 없는 검수자가 아닙니다.
 
 ## 설치
 
@@ -89,6 +91,10 @@ Python 3.9 이상이 필요한데, macOS와 대부분의 리눅스에는 이미 
 
 > "docs/guide.md 에 코멘트 남겼어. 확인하고 고쳐줘."
 
+반대 방향은 이렇게 말합니다.
+
+> "docs/guide.md 검수하고, 고치지 말고 코멘트로 남겨줘."
+
 같은 도구를 직접 쓸 수도 있습니다.
 
 ```bash
@@ -98,7 +104,15 @@ python3 .agents/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reply <thread-id> --body-file <reply-file>
 python3 .agents/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reanchor <thread-id> --exact-file <anchor-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex create docs/guide.md --line 12 --body-file <body-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex create docs/guide.md --exact-file <quote-file> --body-file <body-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author "MI Delivery Harness" create --batch-file <requests.json> --json
 ```
+
+`create` 는 줄(`--line 12`, 범위는 `12-14`)이나 문서에 한 번만 나오는 정확한 문구를 인용합니다. 일괄 파일은 `{"path", "line" | "exact", "body"}` 요청의 JSON 배열이고, 모든 요청을 먼저 검사한 뒤에 씁니다. 하나라도 틀리면 스레드를 하나도 만들지 않습니다.
 
 `list` 는 각 스레드의 앵커 상태를 보여줍니다.
 

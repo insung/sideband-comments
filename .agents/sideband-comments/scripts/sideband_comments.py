@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Read and answer Sideband Comments from an agent session.
+"""Read, answer and start Sideband Comments from an agent session.
 
 The comment store is append-only JSONL under `<root>/.comments`. Every anchor is a quote of
 the document text, so an edit to the quoted text orphans the thread: `resolve` can no longer
 find it, and the comment stops pointing at anything. This tool makes that state explicit —
 `list` reports it, and `reply` refuses until the thread has been re-anchored.
 
-Deliberately missing: resolving, reopening, deleting and starting threads. Those are the
-reader's decisions, not the agent's.
+`create` starts a thread on a line or an exact quote, one at a time or from a JSON batch. A
+batch is checked in full before anything is written: one bad request means no thread is
+created. What the tool still leaves to the reader: resolving, reopening and deleting threads.
 """
 from __future__ import annotations
 
@@ -95,6 +96,85 @@ def resolve_anchor(text: str, anchor: dict) -> dict:
     if second and best[1] == second[1] and best[2] == second[2]:
         return {"kind": "ambiguous", "candidates": candidates}
     return {"kind": "resolved", "start": best[0], "end": best[0] + len(exact), "confidence": "context"}
+
+
+def context_separates(text: str, anchor: dict) -> bool:
+    """True when prefix and suffix alone single out one occurrence of the quote.
+
+    A freshly captured anchor always resolves, because `position` breaks every tie. The next
+    edit above the quote moves that position, so a quote whose twin shares its context is
+    fragile from the start. `create` refuses it instead of leaning on the tie-break.
+    """
+    exact = anchor["exact"]
+    candidates = occurrences(text, exact)
+    if len(candidates) <= 1:
+        return True
+    scores = []
+    for start in candidates:
+        before = text[max(0, start - len(anchor["prefix"])):start]
+        after = text[start + len(exact):start + len(exact) + len(anchor["suffix"])]
+        scores.append(_common_suffix(before, anchor["prefix"]) + _common_prefix(after, anchor["suffix"]))
+    ranked = sorted(scores, reverse=True)
+    return ranked[0] != ranked[1]
+
+
+def line_span(text: str, start_line: int, end_line: int) -> tuple[int, int]:
+    """Character range covering 1-based lines `start_line..end_line`, trimmed of the whitespace
+    and newlines around them — the quote the editors would capture from a selection."""
+    lines = text.splitlines(keepends=True)
+    if start_line > end_line:
+        raise CommentError(f"line range {start_line}-{end_line} is reversed")
+    for number in (start_line, end_line):
+        if not 1 <= number <= len(lines):
+            raise CommentError(f"line {number} is outside 1..{len(lines)}")
+    offset = sum(len(line) for line in lines[:start_line - 1])
+    segment = "".join(lines[start_line - 1:end_line])
+    stripped = segment.strip()
+    if not stripped:
+        label = f"line {start_line}" if start_line == end_line else f"lines {start_line}-{end_line}"
+        raise CommentError(f"{label} is blank; quote a line that has text")
+    start = offset + (len(segment) - len(segment.lstrip()))
+    return start, start + len(stripped)
+
+
+def anchor_from_span(text: str, start: int, end: int, document_path: str) -> dict:
+    anchor = capture_anchor(text, start, end)
+    if not context_separates(text, anchor):
+        raise CommentError(
+            f"{anchor['exact']!r} is ambiguous in {document_path}: it occurs "
+            f"{len(occurrences(text, anchor['exact']))} times and the surrounding text does not "
+            "separate them; quote a longer span"
+        )
+    return anchor
+
+
+def anchor_from_exact(text: str, exact: str, document_path: str) -> dict:
+    if not exact:
+        raise CommentError("anchor exact text cannot be empty")
+    found = occurrences(text, exact)
+    if not found:
+        raise CommentError(f"{exact!r} does not occur in {document_path}")
+    if len(found) > 1:
+        raise CommentError(
+            f"{exact!r} occurs {len(found)} times in {document_path}; pass a longer quote that occurs once"
+        )
+    return capture_anchor(text, found[0], found[0] + len(exact))
+
+
+def parse_line_spec(value: object) -> tuple[int, int]:
+    """`12`, `"12-14"`, or `{"start": 12, "end": 14}` → (start, end), 1-based and inclusive."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value, value
+    if isinstance(value, dict):
+        start, end = value.get("start"), value.get("end")
+        if all(isinstance(n, int) and not isinstance(n, bool) for n in (start, end)):
+            return start, end
+    if isinstance(value, str):
+        match = re.fullmatch(r"\s*(\d+)\s*(?:-\s*(\d+)\s*)?", value)
+        if match:
+            start = int(match.group(1))
+            return start, int(match.group(2) or start)
+    raise CommentError(f'line must be N, N-M or {{"start": N, "end": M}}, not {value!r}')
 
 
 # --- events --------------------------------------------------------------------------------
@@ -266,33 +346,57 @@ class Store:
                     )
                 time.sleep(0.025)
 
-    def append(self, event: dict) -> None:
+    @staticmethod
+    def _bundle_for(document: str | None, events: dict[str, list[dict]], bundles: dict[str, Path]) -> Path | None:
+        if not document:
+            return None
+        for thread_id, path in bundles.items():
+            if fold_thread(events[thread_id]).document_path == document:
+                return path
+        return None
+
+    def append_many(self, new_events: list[dict]) -> None:
+        """Append events under one lock and one snapshot. Callers validate first: nothing here
+        fails on content, so either every event lands or the lock was never taken."""
         handle, lock_path = self._lock()
         try:
             events, bundles = self.snapshot()
-            previous = events.get(event["threadId"], [])
-            if any(existing["eventId"] == event["eventId"] for existing in previous):
+            writes: dict[Path, list[dict]] = {}
+            for event in new_events:
+                previous = events.get(event["threadId"], [])
+                if any(existing["eventId"] == event["eventId"] for existing in previous):
+                    continue
+                # An existing bundle takes just the new event; anything else migrates the whole
+                # thread into the document's bundle, exactly as the editors do. A brand-new
+                # thread names its document itself.
+                target = bundles.get(event["threadId"])
+                payload = [event]
+                if target is None:
+                    if previous:
+                        document = fold_thread(previous).document_path
+                    elif event["type"] == "thread.created":
+                        document = event["documentPath"]
+                    else:
+                        document = None
+                    target = self._bundle_for(document, events, bundles) or self.documents_dir / f"{uuid.uuid4()}.jsonl"
+                    payload = [*previous, event]
+                    bundles[event["threadId"]] = target
+                writes.setdefault(target, []).extend(payload)
+                events.setdefault(event["threadId"], []).append(event)
+            if not writes:
                 return
-            # An existing bundle takes just the new event; anything else migrates the whole
-            # thread into a document bundle, exactly as the editors do.
-            target = bundles.get(event["threadId"])
-            payload = [event]
-            if target is None:
-                document = fold_thread(previous).document_path if previous else None
-                for thread_id, path in bundles.items():
-                    if document and fold_thread(events[thread_id]).document_path == document:
-                        target = path
-                        break
-                target = target or self.documents_dir / f"{uuid.uuid4()}.jsonl"
-                payload = [*previous, event]
             self.documents_dir.mkdir(parents=True, exist_ok=True)
-            with open(target, "a", encoding="utf8") as file:
-                file.write("".join(json.dumps(item, ensure_ascii=False) + "\n" for item in payload))
-                file.flush()
-                os.fsync(file.fileno())
+            for target, payload in writes.items():
+                with open(target, "a", encoding="utf8") as file:
+                    file.write("".join(json.dumps(item, ensure_ascii=False) + "\n" for item in payload))
+                    file.flush()
+                    os.fsync(file.fileno())
         finally:
             os.close(handle)
             lock_path.unlink(missing_ok=True)
+
+    def append(self, event: dict) -> None:
+        self.append_many([event])
 
 
 # --- commands ------------------------------------------------------------------------------
@@ -381,7 +485,7 @@ def next_revision(store: Store, thread_id: str) -> int:
 
 def open_store(args) -> Store:
     if not args.root:
-        raise CommentError("--root is required for reply and reanchor")
+        raise CommentError("--root is required for create, reply and reanchor")
     base = Path(args.root).resolve()
     if not (base / ".comments").is_dir():
         raise CommentError(f"{base} does not contain a .comments directory")
@@ -452,16 +556,7 @@ def command_reanchor(args) -> int:
         raise CommentError(f"{thread.document_path} does not exist under {store.root}")
     text = document.read_text(encoding="utf8")
     exact = read_input(args.exact, args.exact_file, "exact")
-    if not exact:
-        raise CommentError("anchor exact text cannot be empty")
-    found = occurrences(text, exact)
-    if not found:
-        raise CommentError(f"{exact!r} does not occur in {thread.document_path}")
-    if len(found) > 1:
-        raise CommentError(
-            f"{exact!r} occurs {len(found)} times in {thread.document_path}; "
-            "pass a longer quote that occurs once"
-        )
+    anchor = anchor_from_exact(text, exact, thread.document_path)
     store.append({
         "schemaVersion": SCHEMA_VERSION,
         "eventId": str(uuid.uuid4()),
@@ -470,16 +565,127 @@ def command_reanchor(args) -> int:
         "occurredAt": now(),
         "actor": actor_from(args.author),
         "type": "thread.reanchored",
-        "anchor": capture_anchor(text, found[0], found[0] + len(exact)),
+        "anchor": anchor,
     })
     print(f"Re-anchored {thread.id} to {exact!r} in {thread.document_path}.")
+    return 0
+
+
+def document_in_store(store: Store, value: object) -> tuple[str, Path]:
+    """Root-relative document path and its file. A relative path is taken from the store root;
+    an absolute one must point inside it."""
+    if not isinstance(value, str) or not value:
+        raise CommentError("document path is required")
+    candidate = Path(value)
+    absolute = candidate if candidate.is_absolute() else store.root / candidate
+    try:
+        relative = absolute.resolve().relative_to(store.root.resolve())
+    except ValueError as error:
+        raise CommentError(f"{value} is not inside {store.root}") from error
+    document_path = normalize_document_path(str(relative).replace(os.sep, "/"))
+    file = store.root / document_path
+    if not file.is_file():
+        raise CommentError(f"{document_path} does not exist under {store.root}")
+    return document_path, file
+
+
+def load_batch(file_name: str) -> list[dict]:
+    raw = read_input(None, file_name, "batch")
+    try:
+        items = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise CommentError(f"batch file is not valid JSON: {error}") from error
+    if not isinstance(items, list) or not items:
+        raise CommentError("batch file must hold a non-empty JSON array of requests")
+    if not all(isinstance(item, dict) for item in items):
+        raise CommentError("every batch request must be a JSON object")
+    return items
+
+
+REQUEST_FIELDS = {"path", "line", "exact", "body"}
+
+
+def prepare_thread(store: Store, request: dict, author: str) -> dict:
+    """Check one request against the document as it stands now and build its `thread.created`
+    event. Nothing is written here."""
+    unknown = sorted(set(request) - REQUEST_FIELDS)
+    if unknown:
+        raise CommentError(f"unknown request field(s): {', '.join(unknown)}")
+    document_path, file = document_in_store(store, request.get("path"))
+    text = file.read_text(encoding="utf8")
+    has_line, has_exact = request.get("line") is not None, request.get("exact") is not None
+    if has_line == has_exact:
+        raise CommentError("pass exactly one of line or exact")
+    if has_line:
+        start_line, end_line = parse_line_spec(request["line"])
+        start, end = line_span(text, start_line, end_line)
+        anchor = anchor_from_span(text, start, end, document_path)
+    else:
+        if not isinstance(request["exact"], str):
+            raise CommentError("exact must be a string")
+        anchor = anchor_from_exact(text, request["exact"], document_path)
+    body = request.get("body")
+    if not isinstance(body, str) or not body.strip():
+        raise CommentError("comment body cannot be empty")
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "eventId": str(uuid.uuid4()),
+        "threadId": str(uuid.uuid4()),
+        "revision": 0,
+        "occurredAt": now(),
+        "actor": actor_from(author),
+        "type": "thread.created",
+        "documentPath": document_path,
+        "anchor": anchor,
+        "body": body.strip(),
+    }
+
+
+def command_create(args) -> int:
+    store = open_store(args)
+    single = (args.path, args.line, args.exact, args.exact_file, args.body, args.body_file)
+    if args.batch_file:
+        if any(value is not None for value in single):
+            raise CommentError("--batch-file carries the whole request list; do not combine it with a single request")
+        requests = load_batch(args.batch_file)
+    else:
+        if args.path is None:
+            raise CommentError("pass a document path, or --batch-file with a request list")
+        request: dict = {"path": args.path, "body": read_input(args.body, args.body_file, "body")}
+        if args.line is not None:
+            request["line"] = args.line
+        if args.exact is not None or args.exact_file is not None:
+            request["exact"] = read_input(args.exact, args.exact_file, "exact")
+        requests = [request]
+
+    events, failures = [], []
+    for index, request in enumerate(requests):
+        try:
+            events.append(prepare_thread(store, request, args.author))
+        except CommentError as error:
+            failures.append(f"  [{index}] {error}")
+    if failures:
+        raise CommentError("no threads were created; fix these requests and run again:\n" + "\n".join(failures))
+    store.append_many(events)
+
+    report = [{
+        "index": index,
+        "threadId": event["threadId"],
+        "documentPath": event["documentPath"],
+        "quoted": event["anchor"]["exact"],
+    } for index, event in enumerate(events)]
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
+    for item in report:
+        print(f"Created {item['threadId']} on {item['documentPath']} (quoted: {item['quoted']!r}).")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sideband_comments.py",
-        description="Read and answer Sideband Comments. Resolving threads is left to the reader.",
+        description="Read, answer and start Sideband Comments. Resolving threads is left to the reader.",
     )
     parser.add_argument("--root", help="project root holding .comments (default: found above the path)")
     parser.add_argument("--author", default=os.environ.get("SIDEBAND_AUTHOR", "agent"),
@@ -498,6 +704,20 @@ def build_parser() -> argparse.ArgumentParser:
     reply.add_argument("body", nargs="?", help="reply text; prefer --body-file for shell-sensitive text")
     reply.add_argument("--body-file", help="read reply text from a UTF-8 file, or '-' for stdin")
     reply.set_defaults(handler=command_reply)
+
+    create = sub.add_parser("create", help="start a thread on a document, quoting a line or an exact text")
+    create.add_argument("path", nargs="?", help="document path, relative to --root (an absolute path must be inside it)")
+    where = create.add_mutually_exclusive_group()
+    where.add_argument("--line", help="1-based line to quote, N or N-M; surrounding whitespace is trimmed")
+    where.add_argument("--exact", help="exact text to quote, occurring once in the document")
+    where.add_argument("--exact-file", help="read exact text from a UTF-8 file, or '-' for stdin")
+    create.add_argument("--body", help="comment text; prefer --body-file for shell-sensitive text")
+    create.add_argument("--body-file", help="read comment text from a UTF-8 file, or '-' for stdin")
+    create.add_argument("--batch-file",
+                        help='JSON array of {"path", "line" | "exact", "body"}; every request is checked '
+                             "before any thread is written, and one failure writes nothing")
+    create.add_argument("--json", action="store_true", help="machine-readable report of the created threads")
+    create.set_defaults(handler=command_create)
 
     reanchor = sub.add_parser("reanchor", help="point an orphaned thread at the text that replaced it")
     reanchor.add_argument("thread")

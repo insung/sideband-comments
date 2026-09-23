@@ -24,7 +24,9 @@ per-thread revisions, a store lock, and those quoted anchors; hand-written JSONL
 that the editors then refuse to fold.
 
 The skill gives the agent a tool instead, so you can say "check the comments on this file and fix
-it" and get back edited prose plus a reply on the thread you left.
+it" and get back edited prose plus a reply on the thread you left. It also works the other way round:
+"review this file and leave your findings as comments" gets you threads on the sentences it means,
+without a single edit to the file.
 
 <img src="assets/step-2-read.svg" alt="An agent reading the note" width="520">
 
@@ -86,7 +88,13 @@ It will not resolve your threads. Deciding that a comment is answered belongs to
 so the tool has **no `resolve` command at all** — the constraint is in the tool's surface, not in a
 sentence the model might read past. Resolve threads yourself in VS Code or Obsidian.
 
-It also will not create new threads, delete comments, or reopen resolved ones, for the same reason.
+It also will not delete comments or reopen resolved ones, for the same reason.
+
+It **can** start a thread — the `create` command — but only when you ask for a review as comments,
+or when a review harness hands it final findings to publish. It never starts a thread on a sentence it
+is about to rewrite itself, and it never publishes findings while another review round is still to
+come, because those threads would become the next reviewer's input. The thread is signed by whoever ran
+the tool (`--author`), not by a reviewer that never touched the store.
 
 ## Install
 
@@ -112,6 +120,10 @@ Ask in your own words, naming a file or a directory:
 
 > "docs/guide.md 에 코멘트 남겼어. 확인하고 고쳐줘."
 
+or, for the reverse:
+
+> "docs/guide.md 검수하고, 고치지 말고 코멘트로 남겨줘."
+
 You can run the same tool yourself:
 
 ```bash
@@ -121,7 +133,17 @@ python3 .agents/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reply <thread-id> --body-file <reply-file>
 python3 .agents/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reanchor <thread-id> --exact-file <anchor-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex create docs/guide.md --line 12 --body-file <body-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author Codex create docs/guide.md --exact-file <quote-file> --body-file <body-file>
+python3 .agents/sideband-comments/scripts/sideband_comments.py \
+  --root "$PWD" --author "MI Delivery Harness" create --batch-file <requests.json> --json
 ```
+
+`create` quotes a line (`--line 12`, or `12-14` for a range) or an exact text that occurs once. A batch
+file is a JSON array of `{"path", "line" | "exact", "body"}` requests; every request is checked before
+anything is written, and one bad request means no thread is created.
 
 `list` reports each thread's anchor state:
 
