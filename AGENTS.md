@@ -28,15 +28,23 @@ git status --porcelain
 
 출력이 비어 있지 않으면 배포하지 않는다. 태그는 배포한 그 커밋에만 붙인다.
 
-## 고치는 동안 지켜야 할 두 가지
+## 고치는 동안 지켜야 할 세 가지
 
 에이전트가 반복 수정하며 가장 쉽게 어기는 규칙이고, 실제로 어겨서 사고가 났다.
 
-### 버전은 릴리스 주기에 한 번만 올린다
+### 작업을 마치면 CHANGELOG 를 쓴다
 
-한 변경의 릴리즈 노트를 쓸 때 다음 버전으로 **한 번** 올리고, 그 버전으로 `.vsix`를 만들어 로컬에서 검증한다. 검증을 되풀이해도 **다시 올리지 않는다.** 같은 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
+기능 추가나 수정을 마치면 **같은 작업 안에서** `apps/vscode/CHANGELOG.md` 맨 위에 새 버전 항목을 쓴다. 다른 작업의 버전 항목에 끼워 넣지 않는다. 그 버전이 아직 배포되지 않았어도 새 버전 항목을 만든다.
 
-버전 번호는 마켓플레이스에 올라간 것의 다음 번호이지, 로컬 빌드 횟수가 아니다. 프리뷰 결함을 고치는 동안 검증 빌드마다 1.0.6 → 1.0.7 → 1.0.8로 올려놨는데 마켓플레이스는 계속 1.0.5였고, 결국 1.0.6으로 되돌려야 했다. 올리는 시점은 릴리즈 노트를 쓰는 **그 한 번**뿐이다.
+형식은 아래 「VS Code 배포」 4번을 따른다. `### Verification` 에는 실제로 통과한 결과만 쓴다. Obsidian GitHub Release 본문에도 같은 버전의 항목을 붙인다.
+
+### 버전은 두 앱을 같은 번호로, 작업마다 한 번만 올린다
+
+VS Code 확장과 Obsidian 플러그인은 **항상 같은 버전 번호**를 쓴다. 한쪽 앱만 바뀐 작업도 두 앱을 함께 올린다. 두 버전이 다르면 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
+
+새 번호는 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호다. CHANGELOG 를 쓸 때 **한 번** 올리고, 그 버전으로 `.vsix`를 만들어 로컬에서 검증한다. 검증을 되풀이해도 **다시 올리지 않는다.** 같은 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
+
+버전 번호는 작업 수를 따르고, 로컬 빌드 횟수를 따르지 않는다. 프리뷰 결함 하나를 고치는 동안 검증 빌드마다 1.0.6 → 1.0.7 → 1.0.8로 올려놨는데 마켓플레이스는 계속 1.0.5였고, 결국 1.0.6으로 되돌려야 했다. 올리는 시점은 CHANGELOG 를 쓰는 **그 한 번**뿐이다.
 
 로컬 재설치 시 주의: 더 높은 버전의 확장 디렉터리가 `~/.vscode/extensions/`에 남아 있으면 VS Code는 그쪽을 로드한다. 낮은 버전을 `--force`로 설치해도 소용없다.
 
@@ -63,11 +71,17 @@ VS Code 확장은 **Visual Studio Marketplace에 publish 하는 것이 배포다
 npm run typecheck && npm test && npm run build
 ```
 
-### 2. 버전 올리기와 릴리즈 노트 — 릴리스 주기에 한 번
+### 2. 버전 올리기와 릴리즈 노트 — 작업마다 한 번
 
-마켓플레이스의 현재 버전을 먼저 확인하고, 그 다음 번호로 올린다. `apps/vscode/package.json`의 `version`과 `scripts.package`의 `.vsix` 파일명을 **함께** 올린다. 둘이 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
+`apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호로 **두 앱을 같은 번호로 함께** 올린다. 아래 값을 모두 바꾼다. 하나라도 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
 
-VS Code와 Obsidian은 `major.minor`를 공유해야 한다. 패치 번호는 각자 올려도 된다.
+| 파일 | 바꿀 값 |
+| --- | --- |
+| `apps/vscode/package.json` | `version`, `scripts.package` 의 `.vsix` 파일명 |
+| `apps/obsidian/package.json` | `version`, `scripts.package` 의 `.zip` 파일명 |
+| `apps/obsidian/manifest.json`, `manifest.json` | `version` (두 파일은 완전히 같아야 한다) |
+| `versions.json` | 새 버전을 `minAppVersion` 에 매핑하는 항목 |
+| `package-lock.json` | `apps/vscode`, `apps/obsidian` 의 `version` |
 
 ```bash
 npm run check:app-versions
@@ -87,7 +101,7 @@ code --install-extension apps/vscode/dist/sideband-comments-vscode-<version>.vsi
 
 ### 4. 릴리즈 노트
 
-`apps/vscode/CHANGELOG.md` 맨 위에 새 버전 항목을 추가하고, 같은 내용을 GitHub Release 본문에 붙인다. Marketplace 는 이 파일을 Changelog 탭으로 보여준다.
+`apps/vscode/CHANGELOG.md` 맨 위에 새 버전 항목을 추가하고, 같은 내용을 Obsidian GitHub Release 본문에 붙인다. Marketplace 는 이 파일을 Changelog 탭으로 보여준다.
 
 형식:
 
@@ -98,7 +112,7 @@ code --install-extension apps/vscode/dist/sideband-comments-vscode-<version>.vsi
 - `Fixed` 에는 무엇이 잘못됐었는지가 드러나야 한다. "Fix preview bug" 가 아니라 무엇이 안 되다가 되는지 쓴다.
 - `### Verification` 에는 **실제로 통과한 것만** 적는다. 사용자가 확인하지 않은 동작을 확인했다고 쓰지 않는다.
 
-릴리즈 노트는 버전을 올리는 시점, 즉 로컬 검증 전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다. `### Verification` 은 로컬 검증이 끝난 뒤 실제 결과로 채운다.
+릴리즈 노트는 작업을 마치고 버전을 올리는 시점, 즉 로컬 검증 전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다. `### Verification` 은 로컬 검증이 끝난 뒤 실제 결과로 채운다.
 
 ### 5. publish
 
@@ -159,7 +173,7 @@ mkdir -p ~/sideband-try/.obsidian/plugins/sideband-comments
 cp apps/obsidian/dist/main.js apps/obsidian/dist/manifest.json apps/obsidian/dist/styles.css ~/sideband-try/.obsidian/plugins/sideband-comments/
 ```
 
-Obsidian 버전은 플러그인 코드가 바뀐 릴리스에서만 올린다. 커뮤니티 스토어 버전과 폴더의 `manifest.json` 버전이 같으면 스토어가 덮어쓰지 않는다. 플러그인의 파일 감시는 `threads/` 만 보고, 창 포커스·노트 열기 때 다시 읽는다. 터미널에서 도구를 실행한 뒤 Obsidian 창을 클릭하면 새 스레드가 보인다.
+Obsidian 버전은 VS Code 와 같은 번호로 함께 올린다. 커뮤니티 스토어 버전과 폴더의 `manifest.json` 버전이 같으면 스토어가 덮어쓰지 않는다. 플러그인의 파일 감시는 `threads/` 만 보고, 창 포커스·노트 열기 때 다시 읽는다. 터미널에서 도구를 실행한 뒤 Obsidian 창을 클릭하면 새 스레드가 보인다.
 
 ### 5. 에이전트 도구와 편집기 교차 확인
 

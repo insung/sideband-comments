@@ -133,7 +133,7 @@ npm run build
 
 ## App version policy
 
-VS Code and Obsidian releases may increment their patch versions independently, but they must share the same `major.minor` line. For example, VS Code `1.0.3` and Obsidian `1.0.7` are valid; `1.1.x` and `1.0.x` are not. Obsidian's package and manifest versions must match exactly.
+VS Code and Obsidian releases always share the same version. A change to only one app still bumps both, so VS Code `1.0.9` ships with Obsidian `1.0.9`. Obsidian's package and manifest versions must match exactly.
 
 `npm test`, the root build, each app package command, and the `App version policy` GitHub Actions check run the same validation:
 

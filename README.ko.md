@@ -127,7 +127,7 @@ npm run build
 
 ## 앱 버전 정책
 
-VS Code 와 Obsidian 릴리즈는 패치 번호를 각자 올릴 수 있지만 `major.minor` 는 같아야 합니다. 예를 들어 VS Code `1.0.3` 과 Obsidian `1.0.7` 은 괜찮지만 `1.1.x` 와 `1.0.x` 는 안 됩니다. Obsidian 의 package 와 manifest 버전은 정확히 일치해야 합니다.
+VS Code 와 Obsidian 릴리즈는 항상 같은 버전을 씁니다. 한쪽 앱만 바뀌어도 두 앱의 버전을 함께 올립니다. 예를 들어 VS Code `1.0.9` 와 Obsidian `1.0.9` 를 함께 냅니다. Obsidian 의 package 와 manifest 버전은 정확히 일치해야 합니다.
 
 `npm test`, 루트 빌드, 각 앱의 package 명령, 그리고 `App version policy` GitHub Actions 검사가 모두 같은 검증을 돌립니다.
 

@@ -9,9 +9,10 @@ function readJson(relativePath) {
 }
 
 function parseVersion(label, version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
-  if (!match) throw new Error(`${label} has an invalid SemVer version: ${version}`);
-  return { version, line: `${match[1]}.${match[2]}` };
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error(`${label} has an invalid SemVer version: ${version}`);
+  }
+  return version;
 }
 
 function requireArtifactVersion(label, packageJson, suffix) {
@@ -31,10 +32,8 @@ export function assertAppVersionPolicy({
   const vscode = parseVersion("VS Code", vscodePackage.version);
   const obsidian = parseVersion("Obsidian", obsidianPackage.version);
 
-  if (vscode.line !== obsidian.line) {
-    throw new Error(
-      `VS Code and Obsidian must share major.minor: ${vscode.version} != ${obsidian.version}`
-    );
+  if (vscode !== obsidian) {
+    throw new Error(`VS Code and Obsidian must share the same version: ${vscode} != ${obsidian}`);
   }
   if (obsidianPackage.version !== obsidianManifest.version) {
     throw new Error(
@@ -44,15 +43,15 @@ export function assertAppVersionPolicy({
   if (JSON.stringify(rootObsidianManifest) !== JSON.stringify(obsidianManifest)) {
     throw new Error("Root and app Obsidian manifests must match exactly");
   }
-  if (obsidianVersions[obsidian.version] !== obsidianManifest.minAppVersion) {
+  if (obsidianVersions[obsidian] !== obsidianManifest.minAppVersion) {
     throw new Error(
-      `Obsidian versions.json must map ${obsidian.version} to ${obsidianManifest.minAppVersion}`
+      `Obsidian versions.json must map ${obsidian} to ${obsidianManifest.minAppVersion}`
     );
   }
 
   requireArtifactVersion("sideband-comments-vscode", vscodePackage, "vsix");
   requireArtifactVersion("sideband-comments-obsidian", obsidianPackage, "zip");
-  return { vscode: vscode.version, obsidian: obsidian.version };
+  return { vscode, obsidian };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
