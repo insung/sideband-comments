@@ -3,6 +3,16 @@
 Release notes for the Sideband Comments extension for VS Code. Notes for the Obsidian plugin
 are published with each [GitHub release](https://github.com/insung/sideband-comments/releases).
 
+## 1.0.9
+
+### Added
+
+- Highlight the comment whose quoted text holds the editor cursor in **Comment Details** and scroll the panel to it, choosing the innermost comment when quotes overlap.
+
+### Verification
+
+- Typecheck and 135 tests passed.
+
 ## 1.0.8
 
 ### Added
