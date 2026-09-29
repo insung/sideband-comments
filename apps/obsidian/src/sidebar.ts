@@ -18,6 +18,7 @@ export class SidebandSidebarView extends ItemView {
   private selectedDocumentPath: string | undefined;
   private selectionPreview: HTMLElement | undefined;
   private selectionPreviewPath: string | undefined;
+  private focusedThread: { documentPath: string; threadId: string } | undefined;
   private readonly collapsedDirectories = new Set<string>();
   private renderRevision = 0;
   private renderedSignature: string | undefined;
@@ -78,6 +79,28 @@ export class SidebandSidebarView extends ItemView {
       const pane = container.querySelector<HTMLElement>(selector);
       if (pane) pane.scrollTop = scrollTop;
     }
+    this.markFocusedThread();
+  }
+
+  /** Marks the card of the comment under the editor cursor, and scrolls to it when the cursor moves to another comment. */
+  focusThread(documentPath: string, threadId: string | undefined): void {
+    const previous = this.focusedThread?.threadId;
+    this.focusedThread = threadId ? { documentPath, threadId } : undefined;
+    const card = this.markFocusedThread();
+    if (card && threadId !== previous) card.scrollIntoView({ block: "nearest" });
+  }
+
+  private markFocusedThread(): HTMLElement | undefined {
+    const focused = this.focusedThread?.documentPath === this.selectedDocumentPath
+      ? this.focusedThread?.threadId
+      : undefined;
+    let match: HTMLElement | undefined;
+    for (const card of Array.from(this.containerEl.querySelectorAll<HTMLElement>(".sideband-thread"))) {
+      const isFocused = focused !== undefined && card.dataset.threadId === focused;
+      card.toggleClass("is-focused", isFocused);
+      if (isFocused) match = card;
+    }
+    return match;
   }
 
   private async renderPanes(
@@ -177,7 +200,10 @@ export class SidebandSidebarView extends ItemView {
   }
 
   private async renderThread(container: HTMLElement, model: ThreadViewModel): Promise<void> {
-    const card = container.createDiv({ cls: `sideband-thread${model.status === "resolved" ? " is-resolved" : ""}` });
+    const card = container.createDiv({
+      cls: `sideband-thread${model.status === "resolved" ? " is-resolved" : ""}`,
+      attr: { "data-thread-id": model.id }
+    });
     const heading = card.createDiv({ cls: "sideband-thread-heading" });
     const title = heading.createDiv();
     title.createEl("strong", { text: model.status === "resolved" ? "✓ Resolved" : "Open" });

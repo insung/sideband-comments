@@ -75,3 +75,19 @@ export function resolveAnchor(text: string, anchor: QuoteAnchor): AnchorResoluti
     confidence: "context"
   };
 }
+
+export interface ThreadRange {
+  id: string;
+  start: number;
+  end: number;
+}
+
+/** The thread whose anchor holds the cursor. Overlapping anchors resolve to the innermost one. */
+export function threadAtOffset(ranges: readonly ThreadRange[], offset: number): string | undefined {
+  let best: ThreadRange | undefined;
+  for (const range of ranges) {
+    if (offset < range.start || offset > range.end) continue;
+    if (!best || range.end - range.start < best.end - best.start) best = range;
+  }
+  return best?.id;
+}

@@ -6,8 +6,10 @@ import {
   lineNumberMarkers,
   type DecorationSet
 } from "@codemirror/view";
+import { threadAtOffset, type ThreadRange } from "@sideband-comments/core";
 
 export interface HighlightRange {
+  id: string;
   start: number;
   end: number;
   status: "open" | "resolved";
@@ -43,7 +45,8 @@ function highlightState(editorState: EditorState, ranges: readonly HighlightRang
     .filter((range) => range.start >= 0 && range.end > range.start && range.end <= editorState.doc.length)
     .sort((a, b) => a.start - b.start || a.end - b.end);
   const decorations = Decoration.set(valid.map((range) => Decoration.mark({
-    class: range.status === "resolved" ? "sideband-anchor is-resolved" : "sideband-anchor"
+    class: range.status === "resolved" ? "sideband-anchor is-resolved" : "sideband-anchor",
+    threadId: range.id
   }).range(range.start, range.end)), true);
   const lineStatuses = new Map<number, HighlightRange["status"]>();
   for (const range of valid) {
@@ -74,3 +77,12 @@ export const sidebandHighlightField = StateField.define<SidebandHighlightState>(
     lineNumberMarkers.from(field, (value) => value.markers)
   ]
 });
+
+/** The comment whose highlight holds the cursor. Highlights follow edits, so this stays right between refreshes. */
+export function sidebandThreadAt(state: EditorState, position: number): string | undefined {
+  const ranges: ThreadRange[] = [];
+  state.field(sidebandHighlightField, false)?.decorations.between(position, position, (from, to, decoration) => {
+    ranges.push({ id: decoration.spec.threadId as string, start: from, end: to });
+  });
+  return threadAtOffset(ranges, position);
+}

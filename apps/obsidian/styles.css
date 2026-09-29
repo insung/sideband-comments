@@ -146,6 +146,12 @@
   opacity: 0.7;
 }
 
+.sideband-thread.is-focused {
+  border-left-color: var(--color-yellow);
+  background-color: color-mix(in srgb, var(--color-yellow) 10%, transparent);
+  opacity: 1;
+}
+
 .sideband-thread-heading {
   display: flex;
   align-items: center;

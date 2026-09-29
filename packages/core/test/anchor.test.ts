@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureAnchor, resolveAnchor } from "../src/index.js";
+import { captureAnchor, resolveAnchor, threadAtOffset } from "../src/index.js";
 
 describe("quote anchors", () => {
   it("captures surrounding context and resolves after text moves", () => {
@@ -32,5 +32,29 @@ describe("quote anchors", () => {
   it("reports an orphan instead of silently attaching to unrelated text", () => {
     const anchor = captureAnchor("before exact after", 7, 12);
     expect(resolveAnchor("before changed after", anchor)).toEqual({ kind: "orphaned" });
+  });
+});
+
+describe("thread under the cursor", () => {
+  const ranges = [
+    { id: "outer", start: 10, end: 40 },
+    { id: "inner", start: 20, end: 25 },
+    { id: "later", start: 50, end: 60 }
+  ];
+
+  it("finds the anchor that holds the cursor, including both of its edges", () => {
+    expect(threadAtOffset(ranges, 55)).toBe("later");
+    expect(threadAtOffset(ranges, 50)).toBe("later");
+    expect(threadAtOffset(ranges, 60)).toBe("later");
+  });
+
+  it("finds nothing when the cursor is outside every anchor", () => {
+    expect(threadAtOffset(ranges, 45)).toBeUndefined();
+    expect(threadAtOffset([], 0)).toBeUndefined();
+  });
+
+  it("picks the innermost anchor when anchors overlap", () => {
+    expect(threadAtOffset(ranges, 22)).toBe("inner");
+    expect(threadAtOffset(ranges, 30)).toBe("outer");
   });
 });

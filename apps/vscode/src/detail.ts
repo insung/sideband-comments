@@ -1,11 +1,19 @@
 import * as vscode from "vscode";
-import { captureAnchor, resolveAnchor, type QuoteAnchor, type ThreadState } from "@sideband-comments/core";
+import {
+  captureAnchor,
+  resolveAnchor,
+  threadAtOffset,
+  type QuoteAnchor,
+  type ThreadRange,
+  type ThreadState
+} from "@sideband-comments/core";
 import {
   composerState,
   pickCommentSelection,
   pinnedSelectionApplies,
   type EditorSelection
 } from "./selection-source.js";
+import { anchorRanges } from "./thread-focus.js";
 import type { WorkspaceComments } from "./workspace.js";
 
 interface SelectedDocument {
@@ -50,6 +58,9 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
   private readonly lastSelection = new Map<string, EditorSelection>();
   private pinned: PinnedAnchor | undefined;
   private composerReady = false;
+  private shownThreads: { uri: string; threads: readonly ThreadState[] } | undefined;
+  private anchorRangeCache: { uri: string; version: number; ranges: ThreadRange[] } | undefined;
+  private focusedThreadId: string | undefined;
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -96,10 +107,34 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
 
   /** Remembers the newest real selection so the sidebar keeps working once focus leaves the editor. */
   noteSelection(editor: vscode.TextEditor): void {
+    this.updateFocusedThread(editor);
     if (editor.document.uri.scheme !== "comment" && !editor.selection.isEmpty) {
       this.lastSelection.set(editor.document.uri.toString(), this.selectionOf(editor));
     }
     if (this.composerReady !== (this.pendingAnchor() !== undefined)) this.refresh();
+  }
+
+  /** Points the sidebar at the comment under the editor cursor. */
+  private updateFocusedThread(editor: vscode.TextEditor): void {
+    // A native comment input is a text editor too; typing a reply keeps the current comment.
+    if (editor.document.uri.scheme === "comment") return;
+    const threadId = this.threadUnderCursor(editor);
+    if (threadId === this.focusedThreadId) return;
+    this.focusedThreadId = threadId;
+    void this.view?.webview.postMessage({ type: "focus", threadId });
+  }
+
+  private threadUnderCursor(editor: vscode.TextEditor): string | undefined {
+    const document = editor.document;
+    const uri = document.uri.toString();
+    const shown = this.shownThreads;
+    if (!shown || shown.uri !== uri || this.selected?.uri.toString() !== uri) return undefined;
+    const cache = this.anchorRangeCache;
+    const ranges = cache?.uri === uri && cache.version === document.version
+      ? cache.ranges
+      : anchorRanges(document.getText(), shown.threads);
+    this.anchorRangeCache = { uri, version: document.version, ranges };
+    return threadAtOffset(ranges, document.offsetAt(editor.selection.active));
   }
 
   /** Pins a Markdown preview selection so its comment can be written in this sidebar. */
@@ -233,6 +268,8 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
     const revision = ++this.renderRevision;
     const selected = this.selected;
     if (!selected) {
+      this.shownThreads = undefined;
+      this.focusedThreadId = undefined;
       await view.webview.postMessage({ type: "render", documentUri: "", title: "Comment Details", content: `<p class="empty">Open a file with comments to begin.</p>` });
       return;
     }
@@ -243,11 +280,19 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
     view.title = "Comment Details";
     view.description = selected.documentPath;
     this.composerReady = this.pendingAnchor() !== undefined;
+    const uri = selected.uri.toString();
+    this.shownThreads = { uri, threads };
+    this.anchorRangeCache = undefined;
+    // Panel actions move focus away from the editor, so read the cursor from the editor that shows this file.
+    const editor = [vscode.window.activeTextEditor, ...vscode.window.visibleTextEditors]
+      .find((candidate) => candidate?.document.uri.toString() === uri);
+    if (editor) this.focusedThreadId = this.threadUnderCursor(editor);
     await view.webview.postMessage({
       type: "render",
-      documentUri: selected.uri.toString(),
+      documentUri: uri,
       title: selected.documentPath,
       focusComposer,
+      focusedThread: this.focusedThreadId,
       content: this.content(threads, selected)
     });
   }
@@ -301,7 +346,7 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
       </article>`).join("");
     const status = thread.status === "resolved" ? "Reopen" : "Resolve";
     return `
-      <section class="thread ${thread.status === "resolved" ? "resolved" : ""}">
+      <section class="thread ${thread.status === "resolved" ? "resolved" : ""}" data-thread="${escapeHtml(thread.id)}">
         <div class="thread-heading">
           <button type="button" class="anchor" data-action="openAnchor" data-thread="${escapeHtml(thread.id)}" title="Open anchor in editor">${escapeHtml(thread.originalAnchor.exact)}</button>
           <button type="button" class="secondary" data-action="toggleStatus" data-thread="${escapeHtml(thread.id)}">${status}</button>
@@ -329,8 +374,9 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
           body { padding: 0 12px 18px; color: var(--vscode-foreground); font-family: var(--vscode-font-family); }
           h2 { position: sticky; top: 0; z-index: 2; margin: 0 -12px 12px; padding: 10px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--vscode-sideBar-background); font-size: 13px; }
           .empty { color: var(--vscode-descriptionForeground); }
-          .thread { margin: 12px 0; padding: 10px; border-left: 3px solid var(--vscode-focusBorder); background: var(--vscode-sideBarSectionHeader-background); }
+          .thread { margin: 12px 0; padding: 10px; border-left: 3px solid var(--vscode-focusBorder); background: var(--vscode-sideBarSectionHeader-background); scroll-margin-top: 48px; }
           .thread.resolved { opacity: .72; }
+          .thread.focused { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-inactiveSelectionBackground); opacity: 1; }
           .thread-heading, .comment header, .comment-actions, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
           .anchor { padding: 0; overflow: hidden; color: var(--vscode-textLink-foreground); border: 0; background: transparent; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
           .comment { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--vscode-widget-border); }
@@ -360,6 +406,21 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
           const saved = { drafts: {}, scroll: {}, editing: {}, ...(vscode.getState() || {}) };
           const pending = new Map();
           let documentUri = '', sequence = 0, lastContent = '';
+          let focusedThread, scrollToFocused = false;
+          const setFocusedThread = threadId => {
+            if (threadId === focusedThread) return;
+            focusedThread = threadId;
+            scrollToFocused = threadId !== undefined;
+          };
+          const markFocusedThread = () => {
+            let card;
+            document.querySelectorAll('.thread').forEach(section => {
+              const focused = focusedThread !== undefined && section.dataset.thread === focusedThread;
+              section.classList.toggle('focused', focused);
+              if (focused) card = section;
+            });
+            if (card && scrollToFocused) { card.scrollIntoView({block: 'nearest'}); scrollToFocused = false; }
+          };
           const formKey = form => JSON.stringify([documentUri, form.dataset.action, form.dataset.thread, form.dataset.comment]);
           const persist = () => vscode.setState(saved);
           const capture = () => {
@@ -397,8 +458,11 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
               }
               persist(); restore(); return;
             }
+            if (message.type === 'focus') { setFocusedThread(message.threadId); markFocusedThread(); return; }
             if (message.type !== 'render') return;
+            setFocusedThread(message.focusedThread);
             if (documentUri === message.documentUri && lastContent === message.content) {
+              markFocusedThread();
               if (message.focusComposer) focusComposer();
               return;
             }
@@ -410,6 +474,7 @@ export class SidebandCommentsDetailView implements vscode.WebviewViewProvider, v
             document.querySelector('h2').textContent = message.title;
             document.querySelector('main').innerHTML = message.content;
             restore();
+            markFocusedThread();
             document.querySelectorAll('textarea').forEach(field => {
               if (field.form && formKey(field.form) === focusKey) {
                 field.focus({preventScroll:true}); field.setSelectionRange(start, end);

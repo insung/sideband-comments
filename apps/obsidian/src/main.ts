@@ -15,10 +15,13 @@ import { EditorView } from "@codemirror/view";
 import { captureAnchor, CommentService, type Actor } from "@sideband-comments/core";
 import { JsonlThreadRepository } from "@sideband-comments/jsonl-store";
 import { randomUUID } from "node:crypto";
-import { setSidebandHighlights, sidebandHighlightField } from "./highlight.js";
+import { setSidebandHighlights, sidebandHighlightField, sidebandThreadAt } from "./highlight.js";
 import { DEFAULT_SETTINGS, SidebandSettingTab, type SidebandSettings } from "./settings.js";
 import { SIDEBAND_VIEW_TYPE, SidebandSidebarView } from "./sidebar.js";
 import { buildThreadViewModels, type ThreadViewModel } from "./view-model.js";
+
+const editorViewOf = (view: MarkdownView): EditorView | undefined =>
+  (view.editor as unknown as { cm?: EditorView }).cm;
 
 class TextPromptModal extends Modal {
   private value: string | undefined;
@@ -77,6 +80,10 @@ export default class SidebandCommentsPlugin extends Plugin {
     this.registerEditorExtension(sidebandHighlightField);
     this.registerEditorExtension(EditorView.updateListener.of((update) => {
       if (update.selectionSet) queueMicrotask(() => this.refreshSelectionPreview());
+      const highlightsSet = update.transactions.some((transaction) =>
+        transaction.effects.some((effect) => effect.is(setSidebandHighlights))
+      );
+      if (update.selectionSet || highlightsSet) queueMicrotask(() => this.refreshFocusedThread(update.view));
     }));
     this.registerView(SIDEBAND_VIEW_TYPE, (leaf) => new SidebandSidebarView(leaf, this));
     this.addSettingTab(new SidebandSettingTab(this.app, this));
@@ -170,6 +177,17 @@ export default class SidebandCommentsPlugin extends Plugin {
     }
   }
 
+  /** Points the sidebar at the comment under the cursor of the active note. */
+  private refreshFocusedThread(editorView: EditorView): void {
+    const view = this.markdownView();
+    if (!view?.file || editorViewOf(view) !== editorView) return;
+    const threadId = sidebandThreadAt(editorView.state, editorView.state.selection.main.head);
+    for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAND_VIEW_TYPE)) {
+      const sidebar = leaf.view;
+      if (sidebar instanceof SidebandSidebarView) sidebar.focusThread(view.file.path, threadId);
+    }
+  }
+
   private markdownView(path?: string): MarkdownView | undefined {
     const active = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (active?.file && (!path || active.file.path === path)) return active;
@@ -234,9 +252,8 @@ export default class SidebandCommentsPlugin extends Plugin {
     const view = this.markdownView();
     if (view?.file) {
       const models = await this.modelsFor(view.file.path, view.editor.getValue());
-      const editorView = (view.editor as unknown as { cm?: EditorView }).cm;
-      editorView?.dispatch({ effects: setSidebandHighlights.of(models.flatMap((model) =>
-        model.range ? [{ ...model.range, status: model.status }] : []
+      editorViewOf(view)?.dispatch({ effects: setSidebandHighlights.of(models.flatMap((model) =>
+        model.range ? [{ id: model.id, ...model.range, status: model.status }] : []
       )) });
     }
     for (const leaf of this.app.workspace.getLeavesOfType(SIDEBAND_VIEW_TYPE)) {
