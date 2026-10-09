@@ -3,6 +3,16 @@
 Release notes for the Sideband Comments extension for VS Code. Notes for the Obsidian plugin
 are published with each [GitHub release](https://github.com/insung/sideband-comments/releases).
 
+## 1.0.10
+
+### Changed
+
+- Let the agent tool reply on a thread whose quoted text was deleted, so an agent that removes a sentence on request answers the thread where it is instead of moving it onto an unrelated neighbouring sentence.
+
+### Verification
+
+- Typecheck and 137 tests passed.
+
 ## 1.0.9
 
 ### Added
