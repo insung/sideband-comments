@@ -70,17 +70,26 @@ Sideband Comments는 리뷰 코멘트를 문서 **안**이 아니라 **옆**에 
 
 ## 설치
 
-같은 스킬 디렉터리를 각 에이전트의 사용자 스코프에 링크합니다.
+Claude Code 나 Codex 에 플러그인으로 설치합니다.
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
-ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
+claude plugin marketplace add insung/sideband-comments
+claude plugin install sideband-comments@sideband-comments
 ```
 
-Copilot CLI와 Gemini CLI는 공용 별칭을 사용할 수 있습니다.
+```bash
+codex plugin marketplace add insung/sideband-comments
+codex plugin add sideband-comments@sideband-comments
+```
+
+플러그인은 `plugin/` 만 설치합니다. 스킬 두 개와 도구이고, 편집기 코드는 들어가지 않습니다. 훅이 없어서 요청하기 전에는 아무것도 실행하지 않습니다. 버전은 VS Code 확장·Obsidian 플러그인과 항상 같습니다.
+
+설치한 뒤 에이전트에게 「Sideband Comments 설정해줘」라고 요청하세요. `setup` 스킬이 VS Code 확장, Obsidian 플러그인, 프로젝트의 `.comments` 디렉터리를 확인하고, 설치하거나 만들기 전에 각각 묻습니다. VS Code 확장은 `code --install-extension` 으로 설치하고, Obsidian 은 플러그인 페이지(`obsidian://show-plugin?id=sideband-comments`)를 열어 그 화면에서 설치하고 켜게 합니다. Codex 는 `setup` 을 플러그인 온보딩 단계로 보여줍니다.
+
+Copilot CLI와 Gemini CLI는 플러그인 설치가 없으므로 공용 별칭에 링크합니다.
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.agents/skills/sideband-comments
+ln -s "$PWD/plugin/skills/sideband-comments" ~/.agents/skills/sideband-comments
 ```
 
 Python 3.9 이상이 필요한데, macOS와 대부분의 리눅스에는 이미 있습니다. `.comments` 디렉터리가 있는 프로젝트라면 이 리포지토리가 아니어도 동작합니다.
@@ -98,17 +107,17 @@ Python 3.9 이상이 필요한데, macOS와 대부분의 리눅스에는 이미 
 같은 도구를 직접 쓸 수도 있습니다.
 
 ```bash
-python3 .agents/sideband-comments/scripts/sideband_comments.py list docs/
-python3 .agents/sideband-comments/scripts/sideband_comments.py list --orphaned-only docs/
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py list docs/
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py list --orphaned-only docs/
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reply <thread-id> --body-file <reply-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reanchor <thread-id> --exact-file <anchor-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex create docs/guide.md --line 12 --body-file <body-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex create docs/guide.md --exact-file <quote-file> --body-file <body-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author "MI Delivery Harness" create --batch-file <requests.json> --json
 ```
 
@@ -133,6 +142,6 @@ python3 .agents/sideband-comments/scripts/sideband_comments.py \
 
 이 도구는 설치 없이 어디서나 돌아가도록 Python으로 썼습니다. 그 말은 `packages/core` 와 `packages/jsonl-store` 가 TypeScript로 정의한 이벤트 형식을 **다시 구현했다**는 뜻입니다. 한 형식에 대한 두 구현은 붙잡아 두지 않으면 반드시 갈라집니다.
 
-붙잡아 두는 게 `.agents/sideband-comments/scripts/sideband-comments-tool.test.ts` 입니다. 에디터가 쓰는 `CommentService` 로 스레드를 만들고, 그 위에서 Python 도구를 돌린 뒤, `JsonlThreadRepository` 로 되읽어 **TypeScript 저장소가 Python이 쓴 이벤트를 같은 스레드, 같은 번들로 접는지** 확인합니다. 에디터의 실제 코드를 import 해야만 그 일치를 증명할 수 있어서, 이 테스트만 TypeScript입니다.
+붙잡아 두는 게 `plugin/skills/sideband-comments/scripts/sideband-comments-tool.test.ts` 입니다. 에디터가 쓰는 `CommentService` 로 스레드를 만들고, 그 위에서 Python 도구를 돌린 뒤, `JsonlThreadRepository` 로 되읽어 **TypeScript 저장소가 Python이 쓴 이벤트를 같은 스레드, 같은 번들로 접는지** 확인합니다. 에디터의 실제 코드를 import 해야만 그 일치를 증명할 수 있어서, 이 테스트만 TypeScript입니다.
 
 **이벤트 스키마를 바꾸면 양쪽을 함께 고쳐야 합니다.** 안 고쳤을 때 알려주는 게 저 테스트입니다.

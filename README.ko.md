@@ -77,13 +77,23 @@ Obsidian 은 `apps/obsidian/dist/` 의 `main.js`, `manifest.json`, `styles.css` 
 
 ### AI 에이전트
 
-`.agents/sideband-comments/` 에 에이전트 스킬이 있습니다. Claude Code 같은 에이전트에게 파일의 코멘트를 읽고, 요청받은 내용을 고치고, 스레드에 답글을 남기게 할 수 있습니다. 사용자 스코프에 링크하세요.
+`sideband-comments` 플러그인은 Claude Code 와 Codex 에 에이전트 스킬을 넣습니다. 에이전트에게 파일의 코멘트를 읽고, 요청받은 내용을 고치고, 스레드에 답글을 남기게 할 수 있습니다.
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
+claude plugin marketplace add insung/sideband-comments
+claude plugin install sideband-comments@sideband-comments
 ```
 
-Codex, Copilot CLI, Gemini CLI 는 `~/.agents/skills/` 를 읽습니다. Python 3.9 이상이 필요하며, `.comments` 디렉터리가 있는 프로젝트라면 어디서든 동작합니다.
+```bash
+codex plugin marketplace add insung/sideband-comments
+codex plugin add sideband-comments@sideband-comments
+```
+
+플러그인은 `plugin/` 만 설치합니다. 스킬 두 개와 도구이고, 편집기 코드는 들어가지 않습니다. 훅이 없어서 요청하기 전에는 아무것도 실행하지 않습니다. 버전은 VS Code 확장·Obsidian 플러그인과 항상 같습니다.
+
+설치한 뒤 에이전트에게 「Sideband Comments 설정해줘」라고 요청하세요. `setup` 스킬이 VS Code 확장, Obsidian 플러그인, 프로젝트의 `.comments` 디렉터리를 확인하고, 설치하거나 만들기 전에 각각 묻습니다. VS Code 확장은 `code --install-extension` 으로 설치하고, Obsidian 은 플러그인 페이지(`obsidian://show-plugin?id=sideband-comments`)를 열어 그 화면에서 설치하고 켜게 합니다. Codex 는 `setup` 을 플러그인 온보딩 단계로 보여줍니다.
+
+Copilot CLI, Gemini CLI 는 `plugin/skills/sideband-comments` 를 `~/.agents/skills/` 에 링크해서 씁니다. Python 3.9 이상이 필요하며, `.comments` 디렉터리가 있는 프로젝트라면 어디서든 동작합니다.
 
 코멘트는 문서 텍스트의 인용문에 고정되므로 그 텍스트를 고치면 스레드가 떨어집니다(orphaned). 스킬은 답글을 달기 전에 다시 고정하고, 사용자를 대신해 스레드를 해결 처리하지 않습니다. [가이드 보기](docs/agent-skill.ko.md).
 
@@ -109,7 +119,7 @@ packages/jsonl-store/   .comments 저장 어댑터
 packages/migrate/       Tandem 펜스 블록 이관
 apps/vscode/            VS Code CommentController 어댑터
 apps/obsidian/          Obsidian 사이드바와 Live Preview 어댑터
-.agents/                에이전트 스킬과 그 도구
+plugin/                 Claude Code·Codex 플러그인: 에이전트 스킬과 그 도구
 ```
 
 코어가 스레드 이벤트, 결정적 폴딩, 인용 앵커, 수정·삭제 기록, 해결·재개, 재고정, 파일 이동을 담당합니다. 에디터 패키지는 호스트 API 이벤트를 코어 유스케이스로 옮기는 일만 합니다. VS Code 와 Obsidian 모두 작업 공간 전체 파일 탐색기를 위에, 선택한 파일의 상세 편집기를 아래에 두며 재고정과 해결 항목 표시 조작을 함께 제공합니다.

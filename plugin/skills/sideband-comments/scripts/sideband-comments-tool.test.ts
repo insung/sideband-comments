@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CommentService, captureAnchor } from "../../../packages/core/src/index.js";
-import { JsonlThreadRepository } from "../../../packages/jsonl-store/src/index.js";
+import { CommentService, captureAnchor } from "../../../../packages/core/src/index.js";
+import { JsonlThreadRepository } from "../../../../packages/jsonl-store/src/index.js";
 
 const run = promisify(execFile);
 const tool = new URL("./sideband_comments.py", import.meta.url).pathname;

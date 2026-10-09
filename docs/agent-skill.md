@@ -100,17 +100,32 @@ the tool (`--author`), not by a reviewer that never touched the store.
 
 ## Install
 
-Link the same skill directory into each agent's user scope:
+Install the plugin in Claude Code or Codex:
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
-ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
+claude plugin marketplace add insung/sideband-comments
+claude plugin install sideband-comments@sideband-comments
 ```
 
-Copilot CLI and Gemini CLI can use the cross-runtime alias instead:
+```bash
+codex plugin marketplace add insung/sideband-comments
+codex plugin add sideband-comments@sideband-comments
+```
+
+The plugin installs only `plugin/` — two skills and the tool — not the editor code. It has no
+hooks, so it runs nothing until you ask. Its version always matches the VS Code extension and the
+Obsidian plugin.
+
+Then ask the agent to "set up Sideband Comments". The `setup` skill checks the VS Code extension, the
+Obsidian plugin and the project's `.comments` directory, and asks before it installs or creates any
+of them. It installs the VS Code extension with `code --install-extension`, and opens the Obsidian
+plugin page (`obsidian://show-plugin?id=sideband-comments`) so you install and enable it there. Codex
+offers `setup` as the plugin's onboarding step.
+
+Copilot CLI and Gemini CLI have no plugin install; link the skill into the cross-runtime alias:
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.agents/skills/sideband-comments
+ln -s "$PWD/plugin/skills/sideband-comments" ~/.agents/skills/sideband-comments
 ```
 
 It needs Python 3.9 or later, which macOS and most Linux distributions already have. The skill works
@@ -129,17 +144,17 @@ or, for the reverse:
 You can run the same tool yourself:
 
 ```bash
-python3 .agents/sideband-comments/scripts/sideband_comments.py list docs/
-python3 .agents/sideband-comments/scripts/sideband_comments.py list --orphaned-only docs/
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py list docs/
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py list --orphaned-only docs/
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reply <thread-id> --body-file <reply-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex reanchor <thread-id> --exact-file <anchor-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex create docs/guide.md --line 12 --body-file <body-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author Codex create docs/guide.md --exact-file <quote-file> --body-file <body-file>
-python3 .agents/sideband-comments/scripts/sideband_comments.py \
+python3 plugin/skills/sideband-comments/scripts/sideband_comments.py \
   --root "$PWD" --author "MI Delivery Harness" create --batch-file <requests.json> --json
 ```
 
@@ -171,7 +186,7 @@ The tool is Python so it runs anywhere with no install step, which means it re-i
 format that `packages/core` and `packages/jsonl-store` define in TypeScript. Two implementations of
 one format drift apart unless something holds them together.
 
-That something is `.agents/sideband-comments/scripts/sideband-comments-tool.test.ts`. It creates a
+That something is `plugin/skills/sideband-comments/scripts/sideband-comments-tool.test.ts`. It creates a
 thread through the editors' own `CommentService`, drives the Python tool over it, and reads the
 result back through `JsonlThreadRepository` — asserting that the TypeScript store folds the
 Python-written events into the same thread, in the same bundle. It is a TypeScript test precisely

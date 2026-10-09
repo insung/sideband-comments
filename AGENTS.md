@@ -11,6 +11,7 @@
 | `packages/migrate` | Anchored Comments v2 → Sideband 이관 |
 | `apps/vscode` | VS Code 확장 |
 | `apps/obsidian` | Obsidian 플러그인 |
+| `plugin` | Claude Code·Codex 플러그인 (에이전트 스킬과 그 도구) |
 
 두 앱은 `packages/*`를 공유한다. 저장소 계층을 고치면 **양쪽 앱이 모두 영향을 받는다.**
 
@@ -82,6 +83,7 @@ npm run typecheck && npm test && npm run build
 | `apps/obsidian/manifest.json`, `manifest.json` | `version` (두 파일은 완전히 같아야 한다) |
 | `versions.json` | 새 버전을 `minAppVersion` 에 매핑하는 항목 |
 | `package-lock.json` | `apps/vscode`, `apps/obsidian` 의 `version` |
+| `plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json` | `version` |
 
 ```bash
 npm run check:app-versions
@@ -178,7 +180,7 @@ Obsidian 버전은 VS Code 와 같은 번호로 함께 올린다. 커뮤니티 �
 ### 5. 에이전트 도구와 편집기 교차 확인
 
 ```bash
-TOOL=.agents/sideband-comments/scripts/sideband_comments.py
+TOOL=plugin/skills/sideband-comments/scripts/sideband_comments.py
 printf '[unclear-wording] CLEAR-001\n\n「즉시」가 어느 시점인지 알 수 없다.\n' > /tmp/body.txt
 python3 $TOOL --root ~/sideband-try --author "MI Delivery Harness" create docs/guide.md --line 5 --body-file /tmp/body.txt
 python3 $TOOL list ~/sideband-try/docs/guide.md
@@ -232,11 +234,16 @@ Obsidian은 플러그인을 **`https://github.com/insung/sideband-comments/relea
 
 ## 에이전트 스킬
 
-`.agents/sideband-comments/` 에 스킬(`SKILL.md`)과 그 도구(`scripts/sideband_comments.py`)가 있다. 각 에이전트의 사용자 스코프에 링크해서 쓴다.
+`plugin/` 이 Claude Code·Codex 플러그인이다. `plugin/skills/sideband-comments/` 에 스킬(`SKILL.md`)과 그 도구(`scripts/sideband_comments.py`)가, `plugin/skills/setup/` 에 편집기 확장과 `.comments/` 설치를 안내하는 스킬이 있다. 저장소 루트의 `.claude-plugin/marketplace.json`(Claude Code)과 `.agents/plugins/marketplace.json`(Codex)이 `./plugin` 만 가리킨다. `apps/`, `packages/` 를 플러그인에 넣지 않는다.
+
+- 플러그인 버전(`plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json` 의 `version`)도 두 앱과 같은 번호로 함께 올린다. 다르면 `npm run check:app-versions` 가 막는다.
+- 훅을 넣지 않는다. 설치 시점에 실행되는 지점이 없고, Codex 는 훅이 있는 플러그인을 공개 디렉터리에 올리지 못한다. 편집기 확장 설치는 `setup` 스킬이 사용자 동의를 받아 한다.
+
+로컬에서 플러그인 설치를 시험하려면 저장소 루트를 마켓플레이스로 추가한다.
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
-ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
+claude plugin marketplace add ./ && claude plugin install sideband-comments@sideband-comments
+codex plugin marketplace add ./ && codex plugin add sideband-comments@sideband-comments
 ```
 
 사용법과 설계 배경은 [docs/agent-skill.ko.md](docs/agent-skill.ko.md) 에 있다. `scripts/` 의 테스트가 이 도구와 `packages/jsonl-store` 가 같은 저장소를 같게 읽고 쓰는지 검증한다 — 이벤트 스키마를 바꾸면 양쪽을 함께 고쳐야 한다.
