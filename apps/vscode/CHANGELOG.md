@@ -3,6 +3,22 @@
 Release notes for the Sideband Comments extension for VS Code. Notes for the Obsidian plugin
 are published with each [GitHub release](https://github.com/insung/sideband-comments/releases).
 
+## 1.0.11
+
+### Added
+
+- Install the agent skills as a Claude Code or Codex plugin with `claude plugin install sideband-comments@sideband-comments` or `codex plugin add sideband-comments@sideband-comments`, instead of linking the repository by hand.
+- Set up the editors from the agent with a `setup` skill that checks the VS Code extension, the Obsidian plugin and the `.comments` directory, and installs the extension, opens the Obsidian plugin page or creates the directory only after you agree.
+
+### Changed
+
+- Keep the plugin version the same as the VS Code extension and the Obsidian plugin.
+
+### Verification
+
+- Typecheck and 144 tests passed.
+- Installed the plugin from a local marketplace in Claude Code 2.1.282 and Codex 0.157.1; both list the `setup` and `sideband-comments` skills, and Codex reports `setup` as the onboarding skill.
+
 ## 1.0.10
 
 ### Changed

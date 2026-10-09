@@ -1,6 +1,6 @@
 {
   "name": "sideband-comments",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Read, answer and leave Sideband Comments review threads from Claude Code or Codex, and set up the VS Code extension and Obsidian plugin.",
   "author": {
     "name": "insung",
