@@ -59,14 +59,16 @@ comment back on the text that replaced it**."
 |---|---|
 | 1 · read | `list` shows every thread on the file, each with its anchor state |
 | 2 · change | The agent edits the document |
-| 3 · check | `list` again — threads whose quote was rewritten now read `orphaned` |
-| 4 · re-attach | `reanchor` points each orphan at the text that replaced it |
-| 5 · confirm | `list` once more; every thread should read `resolved` |
+| 3 · check | `list` again — threads whose quote was rewritten or deleted now read `orphaned` |
+| 4 · re-attach | `reanchor` points each rewritten orphan at the text that replaced it; a deleted quote stays `orphaned` |
+| 5 · confirm | `list` once more; every thread should read `resolved`, except those whose text was deleted |
 | 6 · answer | `reply` adds the agent's comment to the thread |
 
-Steps 3–5 are the loop that keeps comments attached. `reply` runs only for an open thread whose
-anchor is `resolved`; it refuses orphaned, ambiguous, missing-file, closed, and deleted threads. A
-forgotten re-anchor therefore stops the work rather than quietly detaching your comment.
+Steps 3–5 are the loop that keeps comments attached. When a comment asked for a sentence to be
+removed, nothing takes its place, so the agent leaves that thread `orphaned` and replies there
+("Deleted as requested."). Re-anchoring it to a neighbouring sentence would make that sentence look
+like the one you asked to remove. `reply` runs on an open thread whose anchor is `resolved` or
+`orphaned`; it refuses ambiguous, missing-file, closed, and deleted threads.
 
 <img src="assets/step-5-reanchor.svg" alt="The note attached again to the new sentence" width="520">
 

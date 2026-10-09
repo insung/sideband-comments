@@ -466,7 +466,7 @@ def command_list(args) -> int:
         for comment in item["comments"]:
             print(f"  - {comment['author']} ({comment['at']}): {comment['body']}")
         if item["anchor"] == "orphaned":
-            print("  ! the quoted text is gone; re-anchor before replying")
+            print("  ! the quoted text is gone; re-anchor it if the text was rewritten, not if it was deleted")
         print()
     return 0
 
@@ -522,16 +522,10 @@ def command_reply(args) -> int:
     if not body:
         raise CommentError("comment body cannot be empty")
     state = anchor_state(store, thread)
-    if state != "resolved":
-        if state != "orphaned":
-            raise CommentError(
-                f"thread {thread.id} has anchor={state}; reply requires anchor=resolved"
-            )
+    # An orphaned thread is answerable: deleting the quoted text leaves nothing to re-anchor to.
+    if state not in ("resolved", "orphaned"):
         raise CommentError(
-            f"thread {thread.id} is orphaned: the quoted text is no longer in {thread.document_path}.\n"
-            f"  quoted: {thread.anchor['exact']!r}\n"
-            f"Re-anchor it to the text that replaced it, then reply:\n"
-            f"  sideband_comments.py reanchor {thread.id} --exact '<new text>'"
+            f"thread {thread.id} has anchor={state}; reply requires anchor=resolved or orphaned"
         )
     store.append({
         "schemaVersion": SCHEMA_VERSION,

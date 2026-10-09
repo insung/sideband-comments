@@ -88,13 +88,6 @@ describe("sideband_comments.py against the editors' store", () => {
     expect(JSON.parse(stdout)[0].anchor).toBe("orphaned");
   });
 
-  it("refuses to reply while the thread is orphaned, and says how to fix it", async () => {
-    await expect(tell(store, "reply", store.threadId, "Added the approval gate.")).rejects.toMatchObject({
-      code: 1,
-      stderr: expect.stringContaining("reanchor")
-    });
-  });
-
   it("re-anchors to the replacement text and then accepts the reply", async () => {
     await tell(store, "reanchor", store.threadId, "--exact", REPLACEMENT);
     await tell(store, "reply", store.threadId, "Documented the approval gate on the release step.");
@@ -155,6 +148,38 @@ describe("sideband_comments.py against the editors' store", () => {
     const subcommands = [...help.matchAll(/sub\.add_parser\("([a-z-]+)"/g)].map((match) => match[1]);
 
     expect(subcommands.sort()).toEqual(["create", "list", "reanchor", "reply"]);
+  });
+});
+
+describe("sideband_comments.py on a thread whose quoted text was deleted", () => {
+  let store: Store;
+  beforeAll(async () => {
+    store = await seed();
+    await writeFile(store.document, guide.replace(`${QUOTE}\n\n`, ""), "utf8");
+  });
+
+  it("replies without re-anchoring and reports the anchor as still orphaned", async () => {
+    const { stdout } = await tell(store, "reply", store.threadId, "Deleted the sentence as requested.");
+
+    expect(stdout).toContain("anchor=orphaned");
+  });
+
+  it("writes a reply the editors fold into the orphaned thread, with the anchor untouched", async () => {
+    const thread = await store.repository.read(store.threadId);
+
+    expect(thread?.anchor.exact).toBe(QUOTE);
+    expect(thread?.status).toBe("open");
+    expect(thread?.comments.map((comment) => [comment.author.name, comment.body])).toEqual([
+      ["bruce", "Is there really no approval step before production?"],
+      ["Claude", "Deleted the sentence as requested."]
+    ]);
+  });
+
+  it("does not tell the agent to re-anchor before replying", async () => {
+    const { stdout } = await tell(store, "list", store.document);
+
+    expect(stdout).toContain("anchor=orphaned");
+    expect(stdout).not.toContain("re-anchor before replying");
   });
 });
 
