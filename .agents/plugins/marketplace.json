@@ -1,0 +1,20 @@
+{
+  "name": "sideband-comments",
+  "interface": {
+    "displayName": "Sideband Comments"
+  },
+  "plugins": [
+    {
+      "name": "sideband-comments",
+      "source": {
+        "source": "local",
+        "path": "./plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

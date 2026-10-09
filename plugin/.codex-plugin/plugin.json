@@ -1,0 +1,27 @@
+{
+  "name": "sideband-comments",
+  "version": "1.0.11",
+  "description": "Read, answer and leave Sideband Comments review threads from Claude Code or Codex, and set up the VS Code extension and Obsidian plugin.",
+  "author": {
+    "name": "insung",
+    "url": "https://github.com/insung"
+  },
+  "homepage": "https://github.com/insung/sideband-comments",
+  "repository": "https://github.com/insung/sideband-comments",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Sideband Comments",
+    "shortDescription": "Answer and leave review threads kept in .comments.",
+    "longDescription": "Read, answer and leave Sideband Comments review threads from Claude Code or Codex, and set up the VS Code extension and Obsidian plugin.",
+    "developerName": "insung",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Check the Sideband Comments on this document using $sideband-comments."
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md"
+    }
+  }
+}

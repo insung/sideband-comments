@@ -1,0 +1,15 @@
+{
+  "name": "sideband-comments",
+  "owner": {
+    "name": "insung",
+    "url": "https://github.com/insung"
+  },
+  "plugins": [
+    {
+      "name": "sideband-comments",
+      "source": "./plugin",
+      "description": "Read, answer and leave Sideband Comments review threads from Claude Code or Codex, and set up the VS Code extension and Obsidian plugin."
+    }
+  ],
+  "description": "Install the Sideband Comments agent skills as a Claude Code plugin."
+}

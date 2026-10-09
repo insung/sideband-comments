@@ -77,16 +77,30 @@ For Obsidian, copy `main.js`, `manifest.json`, and `styles.css` from `apps/obsid
 
 ### AI agents
 
-`.agents/sideband-comments/` holds an agent skill, so you can ask Claude Code or Codex to read the
-comments on a file, fix what they ask for, and reply on the thread. Link the same source into each
-agent's user scope:
+The `sideband-comments` plugin gives Claude Code and Codex an agent skill, so you can ask them to
+read the comments on a file, fix what they ask for, and reply on the thread.
 
 ```bash
-ln -s "$PWD/.agents/sideband-comments" ~/.claude/skills/sideband-comments
-ln -s "$PWD/.agents/sideband-comments" ~/.codex/skills/sideband-comments
+claude plugin marketplace add insung/sideband-comments
+claude plugin install sideband-comments@sideband-comments
 ```
 
-Copilot CLI and Gemini CLI can use `~/.agents/skills/` as a cross-runtime alias. The skill needs
+```bash
+codex plugin marketplace add insung/sideband-comments
+codex plugin add sideband-comments@sideband-comments
+```
+
+The plugin installs only `plugin/` — two skills and the tool — not the editor code. It has no
+hooks, so it runs nothing until you ask. Its version always matches the VS Code extension and the
+Obsidian plugin.
+
+Then ask the agent to "set up Sideband Comments". The `setup` skill checks the VS Code extension, the
+Obsidian plugin and the project's `.comments` directory, and asks before it installs or creates any
+of them. It installs the VS Code extension with `code --install-extension`, and opens the Obsidian
+plugin page (`obsidian://show-plugin?id=sideband-comments`) so you install and enable it there. Codex
+offers `setup` as the plugin's onboarding step.
+
+Copilot CLI and Gemini CLI can link `plugin/skills/sideband-comments` into `~/.agents/skills/`. The skill needs
 Python 3.9 or later and works on any project with a `.comments` directory.
 
 A comment is anchored to a quote of the document text, so editing that text orphans the thread — the
@@ -115,7 +129,7 @@ packages/jsonl-store/   .comments persistence adapter
 packages/migrate/       Tandem fenced-block migration
 apps/vscode/            VS Code CommentController adapter
 apps/obsidian/          Obsidian sidebar and Live Preview adapter
-.agents/                agent skill and its tool
+plugin/                 Claude Code and Codex plugin: agent skills and their tool
 ```
 
 The core owns thread events, deterministic folding, quote anchors, edit/delete history, resolve/reopen, re-anchor, and file relocation. Editor packages only translate host API events into core use cases. VS Code and Obsidian both present a workspace-wide file explorer above a selected-file detail editor, including re-anchor and show/hide-resolved controls.

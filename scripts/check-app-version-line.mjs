@@ -27,7 +27,9 @@ export function assertAppVersionPolicy({
   obsidianPackage,
   obsidianManifest,
   rootObsidianManifest,
-  obsidianVersions
+  obsidianVersions,
+  claudePlugin,
+  codexPlugin
 }) {
   const vscode = parseVersion("VS Code", vscodePackage.version);
   const obsidian = parseVersion("Obsidian", obsidianPackage.version);
@@ -49,9 +51,16 @@ export function assertAppVersionPolicy({
     );
   }
 
+  if (claudePlugin.version !== vscode) {
+    throw new Error(`Claude Code plugin must share the app version: ${claudePlugin.version} != ${vscode}`);
+  }
+  if (codexPlugin.version !== vscode) {
+    throw new Error(`Codex plugin must share the app version: ${codexPlugin.version} != ${vscode}`);
+  }
+
   requireArtifactVersion("sideband-comments-vscode", vscodePackage, "vsix");
   requireArtifactVersion("sideband-comments-obsidian", obsidianPackage, "zip");
-  return { vscode, obsidian };
+  return { vscode, obsidian, plugin: vscode };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
@@ -60,7 +69,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     obsidianPackage: readJson("apps/obsidian/package.json"),
     obsidianManifest: readJson("apps/obsidian/manifest.json"),
     rootObsidianManifest: readJson("manifest.json"),
-    obsidianVersions: readJson("versions.json")
+    obsidianVersions: readJson("versions.json"),
+    claudePlugin: readJson("plugin/.claude-plugin/plugin.json"),
+    codexPlugin: readJson("plugin/.codex-plugin/plugin.json")
   });
-  console.log(`App version policy passed: VS Code ${result.vscode}, Obsidian ${result.obsidian}`);
+  console.log(`App version policy passed: VS Code ${result.vscode}, Obsidian ${result.obsidian}, plugin ${result.plugin}`);
 }

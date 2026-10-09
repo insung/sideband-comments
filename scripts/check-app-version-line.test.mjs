@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { assertAppVersionPolicy } from "./check-app-version-line.mjs";
 
-function fixture(vscodeVersion, obsidianVersion, manifestVersion = obsidianVersion) {
+function fixture(
+  vscodeVersion,
+  obsidianVersion,
+  manifestVersion = obsidianVersion,
+  claudePluginVersion = vscodeVersion,
+  codexPluginVersion = vscodeVersion
+) {
   const obsidianManifest = {
     id: "sideband-comments",
     version: manifestVersion,
@@ -19,14 +25,17 @@ function fixture(vscodeVersion, obsidianVersion, manifestVersion = obsidianVersi
     },
     obsidianManifest,
     rootObsidianManifest: { ...obsidianManifest },
-    obsidianVersions: { [manifestVersion]: "1.5.0" }
+    obsidianVersions: { [manifestVersion]: "1.5.0" },
+    claudePlugin: { name: "sideband-comments", version: claudePluginVersion },
+    codexPlugin: { name: "sideband-comments", version: codexPluginVersion }
   };
 }
 
 test("accepts VS Code and Obsidian on the same version", () => {
   assert.deepEqual(assertAppVersionPolicy(fixture("0.2.7", "0.2.7")), {
     vscode: "0.2.7",
-    obsidian: "0.2.7"
+    obsidian: "0.2.7",
+    plugin: "0.2.7"
   });
 });
 
@@ -63,4 +72,18 @@ test("requires versions.json to map the plugin version to minAppVersion", () => 
   input.obsidianVersions["0.2.7"] = "1.6.0";
 
   assert.throws(() => assertAppVersionPolicy(input), /versions\.json must map/);
+});
+
+test("requires the Claude Code plugin to share the app version", () => {
+  assert.throws(
+    () => assertAppVersionPolicy(fixture("0.2.7", "0.2.7", "0.2.7", "0.2.6")),
+    /Claude Code plugin must share the app version/
+  );
+});
+
+test("requires the Codex plugin to share the app version", () => {
+  assert.throws(
+    () => assertAppVersionPolicy(fixture("0.2.7", "0.2.7", "0.2.7", "0.2.7", "0.2.8")),
+    /Codex plugin must share the app version/
+  );
 });
