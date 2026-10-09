@@ -45,8 +45,10 @@ sideband_comments.py --root <project-root> --author Codex \
   reply <thread-id> --body-file <reply-file>
 ```
 
-Reply only when the thread is `open` and its anchor is `resolved`. The tool refuses deleted or
-closed threads and `orphaned`, `ambiguous`, or `missing-file` anchors.
+Reply only when the thread is `open` and its anchor is `resolved`, or `orphaned` because you deleted
+the quoted text. The tool refuses deleted or closed threads and `ambiguous` or `missing-file` anchors.
+It accepts any `orphaned` thread, so you decide: an orphan whose text you rewrote must be re-anchored
+first (see below).
 
 Pass `--author` with your own name so the reader can tell your comments from theirs. Write in the
 language the comment is written in. If the latest comment is already yours and the reader has not
@@ -115,21 +117,26 @@ Two flows — do not mix them:
 
 - **Publishing findings.** Create the threads after the final review round and leave the document
   alone. The reader picks them up in the editor.
-- **Answering the reader.** Edit, `list`, `reanchor` the orphans, `reply`. Never create a thread for
-  a problem you are fixing in the same pass.
+- **Answering the reader.** Edit, `list`, `reanchor` the orphans whose text you rewrote, `reply`.
+  Never create a thread for a problem you are fixing in the same pass.
 
 The project must already have a `.comments` directory; the tool does not start a store.
 
 ## After you edit the document
 
-Rewriting the quoted text orphans its thread, and a reply on an orphaned thread points at nothing.
-Run this loop every time you edit a commented file — do not wait for an error to remind you:
+Rewriting or deleting the quoted text orphans its thread. Run this loop every time you edit a
+commented file — do not wait for an error to remind you:
 
 1. Edit the document.
 2. `sideband_comments.py list docs/guide.md` — read the `anchor` state of every thread.
-3. For each `orphaned` thread, `reanchor` it to the text that took the old text's place.
-4. `list` again and confirm every thread reads `resolved`.
-5. Then `reply`.
+3. For each `orphaned` thread, decide what happened to its quoted text:
+   - **You rewrote it.** `reanchor` the thread to the text that took the old text's place.
+   - **You deleted it** (the comment asked for removal, or the edit dropped the sentence). Do not
+     `reanchor`. No text took its place, and any neighbour you pick will look to the reader as if
+     they asked to remove that text. Leave the thread `orphaned`.
+4. `list` again. Every thread must read `resolved`, except the threads whose text you deleted.
+5. Then `reply`. On a thread whose text you deleted, say so first: "Deleted as requested." (in the
+   comment's language, e.g. 「요청대로 삭제함」).
 
 ```bash
 sideband_comments.py --root <project-root> --author Codex \
@@ -157,6 +164,7 @@ still never resolve, reopen or delete them.
 |---|---|
 | Editing the JSONL, or copying the project's `dist/` to script against it | Broken revisions and ids; the editors reject or mis-fold the thread |
 | Replying first, then editing the quoted text | The thread orphans and your reply points at nothing |
+| Re-anchoring a thread whose text you deleted to a neighbouring sentence | The reader sees their "remove this" comment on text that is meant to stay |
 | Re-anchoring with `--exact "deploy"` | It occurs many times; the tool refuses. Quote the sentence |
 | Reporting the fix only in chat | The reader is in their editor, not your terminal, and never sees it |
 | Passing generated text directly in a shell command | Quotes or substitutions change or execute the text; use a UTF-8 input file |
