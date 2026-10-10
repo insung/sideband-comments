@@ -33,19 +33,19 @@ git status --porcelain
 
 에이전트가 반복 수정하며 가장 쉽게 어기는 규칙이고, 실제로 어겨서 사고가 났다.
 
-### 작업을 마치면 CHANGELOG 를 쓴다
+### CHANGELOG 는 릴리즈할 때 쓴다
 
-기능 추가나 수정을 마치면 **같은 작업 안에서** `apps/vscode/CHANGELOG.md` 맨 위에 새 버전 항목을 쓴다. 다른 작업의 버전 항목에 끼워 넣지 않는다. 그 버전이 아직 배포되지 않았어도 새 버전 항목을 만든다.
+기능 추가나 수정 작업에서는 `apps/vscode/CHANGELOG.md` 를 고치지 않는다. 사용자가 릴리즈를 지시하면, 지난 릴리즈 뒤에 머지된 변경을 모아 맨 위에 새 버전 항목 하나로 쓴다. 이미 릴리즈한 버전의 항목에는 끼워 넣지 않는다.
 
 형식은 아래 「VS Code 배포」 4번을 따른다. `### Verification` 에는 실제로 통과한 결과만 쓴다. Obsidian GitHub Release 본문에도 같은 버전의 항목을 붙인다.
 
-### 버전은 두 앱을 같은 번호로, 작업마다 한 번만 올린다
+### 버전은 두 앱과 플러그인을 같은 번호로, 릴리즈마다 한 번만 올린다
 
-VS Code 확장과 Obsidian 플러그인은 **항상 같은 버전 번호**를 쓴다. 한쪽 앱만 바뀐 작업도 두 앱을 함께 올린다. 두 버전이 다르면 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
+VS Code 확장, Obsidian 플러그인, 에이전트 플러그인은 **항상 같은 버전 번호**를 쓴다. 한쪽만 바뀐 릴리즈도 모두 함께 올린다. 두 버전이 다르면 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
 
-새 번호는 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호다. CHANGELOG 를 쓸 때 **한 번** 올리고, 그 버전으로 `.vsix`를 만들어 로컬에서 검증한다. 검증을 되풀이해도 **다시 올리지 않는다.** 같은 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
+새 번호는 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호다. 사용자가 릴리즈를 지시해 CHANGELOG 를 쓸 때 **한 번** 올린다. 기능 작업 중에는 올리지 않고, 로컬 검증은 지금 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
 
-버전 번호는 작업 수를 따르고, 로컬 빌드 횟수를 따르지 않는다. 프리뷰 결함 하나를 고치는 동안 검증 빌드마다 1.0.6 → 1.0.7 → 1.0.8로 올려놨는데 마켓플레이스는 계속 1.0.5였고, 결국 1.0.6으로 되돌려야 했다. 올리는 시점은 CHANGELOG 를 쓰는 **그 한 번**뿐이다.
+버전 번호는 릴리즈 수를 따르고, 작업 수나 로컬 빌드 횟수를 따르지 않는다. 프리뷰 결함 하나를 고치는 동안 검증 빌드마다 1.0.6 → 1.0.7 → 1.0.8로 올려놨는데 마켓플레이스는 계속 1.0.5였고, 결국 1.0.6으로 되돌려야 했다. 올리는 시점은 릴리즈 때 CHANGELOG 를 쓰는 **그 한 번**뿐이다.
 
 로컬 재설치 시 주의: 더 높은 버전의 확장 디렉터리가 `~/.vscode/extensions/`에 남아 있으면 VS Code는 그쪽을 로드한다. 낮은 버전을 `--force`로 설치해도 소용없다.
 
@@ -72,9 +72,9 @@ VS Code 확장은 **Visual Studio Marketplace에 publish 하는 것이 배포다
 npm run typecheck && npm test && npm run build
 ```
 
-### 2. 버전 올리기와 릴리즈 노트 — 작업마다 한 번
+### 2. 버전 올리기와 릴리즈 노트 — 릴리즈마다 한 번
 
-`apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호로 **두 앱을 같은 번호로 함께** 올린다. 아래 값을 모두 바꾼다. 하나라도 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
+사용자가 릴리즈를 지시하면 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호로 **두 앱과 플러그인을 같은 번호로 함께** 올린다. 아래 값을 모두 바꾼다. 하나라도 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
 
 | 파일 | 바꿀 값 |
 | --- | --- |
@@ -91,7 +91,7 @@ npm run check:app-versions
 
 ### 3. 로컬 확인
 
-올린 새 버전으로 패키징해 설치한다. 검증을 되풀이해도 버전은 그대로 둔다.
+릴리즈 전에는 올린 새 버전으로 패키징해 설치한다. 검증을 되풀이해도 버전은 그대로 둔다.
 
 ```bash
 npm run package --workspace apps/vscode
@@ -114,7 +114,7 @@ code --install-extension apps/vscode/dist/sideband-comments-vscode-<version>.vsi
 - `Fixed` 에는 무엇이 잘못됐었는지가 드러나야 한다. "Fix preview bug" 가 아니라 무엇이 안 되다가 되는지 쓴다.
 - `### Verification` 에는 **실제로 통과한 것만** 적는다. 사용자가 확인하지 않은 동작을 확인했다고 쓰지 않는다.
 
-릴리즈 노트는 작업을 마치고 버전을 올리는 시점, 즉 로컬 검증 전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다. `### Verification` 은 로컬 검증이 끝난 뒤 실제 결과로 채운다.
+릴리즈 노트는 릴리즈를 지시받아 버전을 올리는 시점, 즉 릴리즈 전 로컬 검증 전에 쓴다. `apps/vscode/test/release-notes.test.ts` 가 `package.json` 의 버전에 해당하는 항목이 있는지, 섹션 이름과 문장 형식이 맞는지 검사한다. `### Verification` 은 로컬 검증이 끝난 뒤 실제 결과로 채운다.
 
 ### 5. publish
 
@@ -152,9 +152,9 @@ npm run typecheck && npm test
 T=~/sideband-try && mkdir -p "$T/docs" "$T/.comments" && printf '# 배포 안내\n\n## 릴리스 실행\n\n`npm run deploy` 를 실행하면 파이프라인이 즉시 운영에 배포한다.\n\n## 롤백\n\n온콜 담당자에게 연락한다.\n' > "$T/docs/guide.md"
 ```
 
-### 3. VS Code — 새 버전 `.vsix` 를 만들어 설치
+### 3. VS Code — `.vsix` 를 만들어 설치
 
-위 「VS Code 배포」 2번에서 올린 버전으로 패키징한다. `~/.vscode/extensions/` 에 더 높은 버전이 남아 있으면 그쪽이 로드되므로 먼저 지운다.
+지금 버전으로 패키징한다. 릴리즈 전 확인이면 「VS Code 배포」 2번에서 올린 버전이다. `~/.vscode/extensions/` 에 더 높은 버전이 남아 있으면 그쪽이 로드되므로 먼저 지운다.
 
 ```bash
 npm run package --workspace apps/vscode
@@ -236,7 +236,7 @@ Obsidian은 플러그인을 **`https://github.com/insung/sideband-comments/relea
 
 `plugin/` 이 Claude Code·Codex 플러그인이다. `plugin/skills/sideband-comments/` 에 스킬(`SKILL.md`)과 그 도구(`scripts/sideband_comments.py`)가, `plugin/skills/setup/` 에 편집기 확장과 `.comments/` 설치를 안내하는 스킬이 있다. 저장소 루트의 `.claude-plugin/marketplace.json`(Claude Code)과 `.agents/plugins/marketplace.json`(Codex)이 `./plugin` 만 가리킨다. `apps/`, `packages/` 를 플러그인에 넣지 않는다.
 
-- 플러그인 버전(`plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json` 의 `version`)도 두 앱과 같은 번호로 함께 올린다. 다르면 `npm run check:app-versions` 가 막는다.
+- 플러그인 버전(`plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json` 의 `version`)도 릴리즈 때 두 앱과 같은 번호로 함께 올린다. 다르면 `npm run check:app-versions` 가 막는다.
 - 훅을 넣지 않는다. 설치 시점에 실행되는 지점이 없고, Codex 는 훅이 있는 플러그인을 공개 디렉터리에 올리지 못한다. 편집기 확장 설치는 `setup` 스킬이 사용자 동의를 받아 한다.
 
 로컬에서 플러그인 설치를 시험하려면 저장소 루트를 마켓플레이스로 추가한다.
