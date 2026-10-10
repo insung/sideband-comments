@@ -120,7 +120,9 @@ Two flows — do not mix them:
 - **Answering the reader.** Edit, `list`, `reanchor` the orphans whose text you rewrote, `reply`.
   Never create a thread for a problem you are fixing in the same pass.
 
-The project must already have a `.comments` directory; the tool does not start a store.
+The project must already have a `.comments` directory; the tool does not start a store. If it is
+missing, tell the user to run the `setup` skill ("set up Sideband Comments"), which creates it with
+their consent.
 
 ## After you edit the document
 

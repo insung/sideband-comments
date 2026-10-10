@@ -20,6 +20,11 @@ function skill(name: string) {
   return readFileSync(join(pluginRoot, "skills", name, "SKILL.md"), "utf8");
 }
 
+// The skill text is wrapped by hand; compare its sentences, not its line breaks.
+function prose(name: string) {
+  return skill(name).replace(/\s+/g, " ");
+}
+
 describe("plugin packaging", () => {
   it("points both marketplaces at the plugin directory only", () => {
     const claude = readJson(".claude-plugin/marketplace.json");
@@ -84,7 +89,57 @@ describe("plugin packaging", () => {
   it("creates .comments only after the user agrees", () => {
     const setup = skill("setup");
 
-    expect(setup).toContain("mkdir .comments");
+    expect(setup).toContain('mkdir "<project root>/.comments"');
     expect(setup).toMatch(/Never install, open or create anything the user has not agreed to/);
+  });
+
+  it("asks which editors the user works in before checking any", () => {
+    const setup = prose("setup");
+    const question = setup.indexOf("VS Code, Obsidian, or both");
+
+    expect(question).toBeGreaterThan(-1);
+    expect(question).toBeLessThan(setup.indexOf("## 2. Check"));
+    expect(setup).toMatch(/Check, report and install only the editors the user chose/);
+  });
+
+  it("finds the project root the way the tool and VS Code do, and confirms it", () => {
+    const setup = prose("setup");
+
+    expect(setup).toMatch(/first directory that contains `\.comments` or `\.git`/);
+    expect(setup).toMatch(/If no directory has either, offer the current directory/);
+    expect(setup).toMatch(/Show the root to the user and ask them to confirm it/);
+  });
+
+  it("warns when the Obsidian vault root is not the project root", () => {
+    const setup = prose("setup");
+
+    expect(setup).toMatch(/nearest directory that contains `\.obsidian\/`/);
+    expect(setup).toMatch(/vault root is not the project root/);
+  });
+
+  it("reports whether the Obsidian plugin is enabled, not only installed", () => {
+    const setup = prose("setup");
+
+    expect(setup).toContain(".obsidian/community-plugins.json");
+    expect(setup).toMatch(/enabled.*installed but disabled.*missing/s);
+  });
+
+  it("checks Python without installing it", () => {
+    const setup = prose("setup");
+
+    expect(setup).toContain("python3 --version");
+    expect(setup).toMatch(/3\.9 or later/);
+    expect(setup).toMatch(/Do not install Python/);
+  });
+
+  it("recommends tracking a new .comments directory in Git", () => {
+    const setup = prose("setup");
+
+    expect(setup).toMatch(/Recommend tracking `\.comments\/` in Git/);
+    expect(setup).toContain(".comments/.gitkeep");
+  });
+
+  it("points the comments skill at setup when the store is missing", () => {
+    expect(prose("sideband-comments")).toMatch(/does not start a store.*`setup` skill/s);
   });
 });
