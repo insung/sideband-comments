@@ -15,8 +15,11 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Sideband Comments settings"
+    "default_title": "Sideband Comments settings",
+    "default_icon": "icon.png"
   },
+  "icons": { "16": "icon.png", "32": "icon.png", "48": "icon.png", "128": "icon.png" },
+  "web_accessible_resources": [{ "resources": ["icon.png"], "matches": ["file:///*"] }],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true

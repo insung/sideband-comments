@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderMarkdown } from '../src/viewer/render.js';
-import { selectionOffsets } from '../src/viewer/selection.js';
+import { selectionOffsets, sourceRange } from '../src/viewer/selection.js';
 import { authorizeRequest } from '../src/bridge.js';
 
 function rendered(source: string) {
@@ -55,9 +55,86 @@ describe('browser Markdown renderer', () => {
   it('never maps visible link labels or combined text to hidden link destinations', () => {
     const source='[foo](foobar)bar\n'; const {document}=rendered(source);
     const range=document.createRange();range.selectNodeContents(document.querySelector('a')!);
-    expect(()=>selectionOffsets(source,range)).toThrow(/plain|format|source/i);
+    expect(selectionOffsets(source,range)).toEqual({ start: 1, end: 4 });
     range.selectNodeContents(document.querySelector('p')!);
-    expect(()=>selectionOffsets(source,range)).toThrow(/plain|format|source/i);
+    expect(selectionOffsets(source,range)).toEqual({ start: 1, end: 16 });
+  });
+  it('maps element-boundary formatted selection in a document with headings', () => {
+    const source='# Main\n\n## Section\n\n### Deep\n\nReview **this phrase** now.\n';
+    const {document}=rendered(source); const range=document.createRange();
+    range.selectNodeContents(document.querySelector('strong')!);
+    expect(selectionOffsets(source,range)).toEqual({start:source.indexOf('this phrase'),end:source.indexOf('this phrase')+11});
+  });
+  it('limits the ToC to H1/H2 while keeping deeper heading anchors', () => {
+    const {output, document} = rendered('# One\n\n## Two\n\n### Three\n');
+    expect(output.toc.map(x=>x.title)).toEqual(['One','Two']);
+    expect(document.querySelector('h3')?.id).toBe('three');
+  });
+  it.each(['# **repeat** repeat\n', '- **repeat** repeat\n', '| **repeat** | repeat |\n|---|---|\n'])('maps formatted headings, lists and distinct table cells: %s', source => {
+    const {document} = rendered(source);
+    const strong = document.querySelector('strong')!;
+    const range = document.createRange(); range.selectNodeContents(strong);
+    const start = source.indexOf('repeat');
+    expect(selectionOffsets(source,range)).toEqual({start,end:start+6});
+    const restored = sourceRange(document.querySelector('main')!, source, start, start+6);
+    expect(restored?.toString()).toBe('repeat');
+  });
+  it('disambiguates repeated formatted labels and never navigates to hidden destinations', () => {
+    const source = '[repeat](repeat) **repeat** repeat\n';
+    const {document} = rendered(source);
+    const range=document.createRange(); range.selectNodeContents(document.querySelector('strong')!);
+    const start=source.indexOf('repeat',source.indexOf('**'));
+    expect(selectionOffsets(source,range)).toEqual({start,end:start+6});
+    expect(sourceRange(document.querySelector('main')!,source,10,16)).toBeUndefined();
+  });
+  it('preserves UTF16 and CRLF endpoints across inline formatting after metadata', () => {
+    const source='\uFEFF---\r\ntitle: Hidden\r\n---\r\n\r\nHello **😄 bold** end.\r\n';
+    const {document}=rendered(source); const range=document.createRange();
+    range.selectNodeContents(document.querySelector('strong')!);
+    const start=source.indexOf('😄');
+    expect(selectionOffsets(source,range)).toEqual({start,end:start+7});
+  });
+  it('maps soft line wraps and keeps text after hard breaks at its actual source offset', () => {
+    for (const newline of ['\n','\r\n']) {
+      const source='First line'+newline+'second **line**.'+newline;
+      const {document}=rendered(source); const range=document.createRange();
+      range.selectNodeContents(document.querySelector('p')!);
+      expect(selectionOffsets(source,range)).toEqual({start:0,end:source.length-newline.length});
+    }
+    const source='xxx  \nxxx **xxx**'; const {document}=rendered(source);
+    const range=document.createRange();range.selectNodeContents(document.querySelector('strong')!);
+    expect(selectionOffsets(source,range)).toEqual({start:source.lastIndexOf('xxx'),end:source.lastIndexOf('xxx')+3});
+  });
+  it('maps the second identically named table cell and rejects cross-cell selections', () => {
+    const source='| repeat | repeat |\n|---|---|\n'; const {document}=rendered(source);
+    const cells=document.querySelectorAll('th'); const range=document.createRange();
+    range.selectNodeContents(cells[1]!);
+    expect(selectionOffsets(source,range)).toEqual({start:11,end:17});
+    range.setStart(cells[0]!.firstChild!,0);
+    expect(()=>selectionOffsets(source,range)).toThrow(/block|cell/);
+  });
+  it('maps exact inline code and complete bold/link/code paragraphs', () => {
+    const source='Follow **design** [plan](DSN-014) in `DSN-014` now.\n';
+    const {document}=rendered(source);const range=document.createRange();
+    range.selectNodeContents(document.querySelector('code')!);
+    const start=source.lastIndexOf('DSN-014');
+    expect(selectionOffsets(source,range)).toEqual({start,end:start+7});
+    expect(sourceRange(document.querySelector('main')!,source,start,start+7)?.toString()).toBe('DSN-014');
+    range.selectNodeContents(document.querySelector('p')!);
+    expect(selectionOffsets(source,range)).toEqual({start:0,end:source.length-1});
+  });
+  it.each(['` code `','`one\ntwo`','`` code ``'])('rejects normalized inline-code content: %s', source => {
+    const {document}=rendered(source);const range=document.createRange();
+    range.selectNodeContents(document.querySelector('code')!);
+    expect(()=>selectionOffsets(source,range)).toThrow(/source/);
+  });
+  it('rejects transformed entities and code instead of assigning them source text by coincidence', () => {
+    const source='&amp; then ` code `'; const {document}=rendered(source);
+    const range=document.createRange();range.selectNodeContents(document.querySelector('p')!);
+    expect(()=>selectionOffsets(source,range)).toThrow(/source/);
+    expect(sourceRange(document.querySelector('main')!,source,0,1)).toBeUndefined();
+    range.selectNodeContents(document.querySelector('code')!);
+    expect(()=>selectionOffsets(source,range)).toThrow(/source/);
   });
   it('refuses a cross-paragraph selection and selections inside transformed code/diagrams', () => {
     const source = 'First paragraph.\n\nSecond paragraph.\n\n```js\nconst x=1\n```\n';
@@ -67,10 +144,10 @@ describe('browser Markdown renderer', () => {
     const code = document.querySelector('code')!; range.selectNodeContents(code);
     expect(() => selectionOffsets(source,range)).toThrow(/paragraph|block/i);
   });
-  it('rejects a selection whose rendered characters are not contiguous in the Markdown source', () => {
+  it('maps formatted selections by their exact source endpoints', () => {
     const source = 'A **bold** phrase.\n'; const { document } = rendered(source);
     const range = document.createRange(); range.selectNodeContents(document.querySelector('p')!);
-    expect(() => selectionOffsets(source,range)).toThrow(/source|format|exact/i);
+    expect(selectionOffsets(source,range)).toEqual({ start: 0, end: source.length - 1 });
   });
 });
 describe('extension request authorization', () => {

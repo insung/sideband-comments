@@ -9,6 +9,7 @@ const output=join(here,'dist'); await mkdir(output,{recursive:true});
 const result=await build({absWorkingDir:here,entryPoints:{content:'src/content.ts',background:'src/background.ts',options:'src/settings/options.ts'},outdir:output,bundle:true,platform:'browser',format:'iife',target:'chrome120',minify:true,metafile:true,legalComments:'eof'});
 for (const [from,to] of [
   ['manifest.json','manifest.json'],['options.html','options.html'],
+  ['../vscode/resources/sideband-comments-icon.png','icon.png'],
   ['styles/viewer.css','viewer.css'],['styles/options.css','options.css'],
   ['../../node_modules/github-markdown-css/github-markdown-light.css','github.css'],
   ['../../node_modules/prismjs/themes/prism.css','syntax.css']

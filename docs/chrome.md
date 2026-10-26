@@ -48,30 +48,32 @@ The last file contains project paths, author name, and the allowed extension ID.
 
 ## Comment on a document
 
-1. Select text inside one paragraph or list item. Its exact quote appears above **New comment** on the right.
+1. Select text inside one paragraph, heading, list item or table cell. Its quote appears above **New comment** on the right and remains highlighted while you type. Supported inline emphasis and link labels are mapped to their exact source positions.
 2. Enter your comment and click **Add comment**.
 3. Enter a **Reply** under an open thread and click **Send reply**.
 4. Reload the tab to confirm persistence, or inspect the same document in your existing Sideband client.
+5. Click a thread's quoted text to scroll to and highlight its source passage. Click **Resolve** on an open thread to record its resolved state. Use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible.
 
 Markdown files are unchanged. Events are appended to `.comments/documents/*.jsonl`; existing `.comments/threads/*.jsonl` files remain readable. Keep `.comments` synchronized with the same mechanism you already use for your project.
 
-Selection must map to exact source text. Plain paragraphs and list items without inline formatting are supported, including repeated phrases when their exact source position is known. Paragraphs containing links, bold/italic text, inline code, or other formatting are refused rather than guessing a source position. Use an existing editor client to comment on those passages. Multi-paragraph, table, code-block, and diagram selections are not supported in this version.
+Selection endpoints must map to exact source text. Bold/italic text and explicit link labels are supported, including repeated phrases using parser source positions. A selection across formatting may quote Markdown syntax between its endpoints. Transformed text such as entities, normalized inline code or autolinks may be refused when their source positions cannot be proven. Multiple blocks, code blocks and diagrams are not selectable. The panel explains unsupported selections; it never guesses an anchor or silently widens a selection to an entire paragraph.
 
-Resolved threads are readable but do not accept replies. Orphaned or ambiguous anchors also do not accept replies: use an existing editor client to re-anchor or reopen them.
+Resolved threads are readable but do not accept replies. Orphaned or ambiguous anchors also do not accept replies; the panel shows the reason beside the disabled reply form. Open threads can be resolved even when their quote moved. Re-anchor or reopen them in an existing editor client.
 
 ## Refresh and limits
 
-- **Refresh** explicitly reloads the document and comments from disk. There is no autoreload or background polling.
-- If a document changes while you are reading it, a comment/reply using the old version is refused. Click **Refresh**, then select again.
-- The center column is at most 1200px wide. On narrower screens the TOC can be toggled; on small screens comments move below the document.
+- Use Chrome's tab reload (Command-R on macOS) to read document and comment changes. There are no in-page Refresh or Toggle contents buttons, autoreload or background polling. Copy any unsaved drafts before reloading.
+- If a document changes while you are reading it, a comment/reply/resolve using the old version is refused. Reload the Markdown tab, then select again.
+- The center column is at most 1200px wide. ToC lists H1 and H2 only; deeper headings remain in the article. On desktop the ToC, article and comments scroll independently. On narrower screens the ToC appears above the article; small screens stack the comments below it.
 - Drag the divider beside either side panel to adjust its width, or focus the divider and use Left/Right (Home/End for its limits). Chrome remembers these widths locally across documents and tabs. Widths are constrained to keep the article readable; narrow screens keep the stacked layout.
 - A closed YAML frontmatter block at the start of a file is hidden from the article and table of contents. The original Markdown and comment anchor offsets stay unchanged.
 - Open Settings from the extension icon or Chrome's extension details page. The comment panel contains no Settings button.
+- The extension toolbar and Markdown tab use the existing Sideband Comments brand icon. Loading Sideband replaces any previous document favicon; disable other Markdown viewer extensions to prevent competing page rewrites.
 - Local files up to 256 KiB and comment bodies up to 16,000 characters are supported. Very large comment histories may exceed Chrome Native Messaging's 1 MiB response limit; the host reports this instead of emitting a corrupt frame.
 - Supported extensions: `.md`, `.markdown`, `.mdown`, `.mkdn`, `.mkd`.
 - GitHub-style Markdown tables and strikethrough, Mermaid, and common code languages are supported. Unknown code languages remain readable without highlighting.
 - Raw HTML is displayed as text. Diagrams use Mermaid's strict security mode. Comment bodies are displayed as text.
-- There is no emoji conversion, MathJax, theme selector, remote-web-document support, comment edit/delete/resolve UI, browser store publication, or automatic updater.
+- There is no emoji conversion, MathJax, theme selector, remote-web-document support, comment edit/delete/reopen UI, browser store publication, or automatic updater.
 
 Markdown and comments are not uploaded by Sideband Comments. Markdown can contain external links or image URLs; normal browser requests for those resources still follow Chrome's network settings. The extension only renders `file:` Markdown tabs. The local host only reads Markdown inside registered projects and writes their comment stores. Project registration is accepted from the extension settings page, never from document content.
 

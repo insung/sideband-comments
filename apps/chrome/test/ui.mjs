@@ -38,7 +38,7 @@ try {
   await context.exposeBinding('sidebandTestRelay',({page},request)=>relay(request,new URL(page.url()).pathname==='/options.html'?`chrome-extension://${id}/options.html`:pathToFileURL(file).href));
   await context.addInitScript(()=>{
     window.chrome=window.chrome || {};
-    window.chrome.runtime={sendMessage:message=>window.sidebandTestRelay(message)};
+    window.chrome.runtime={sendMessage:message=>window.sidebandTestRelay(message),getURL:name=>`https://sideband.test/${name}`};
   });
   await context.route('https://sideband.test/**',async route=>{
     const path=new URL(route.request().url()).pathname;
@@ -46,8 +46,8 @@ try {
       const text=await readFile(file,'utf8');
       await route.fulfill({contentType:'text/html',body:`<!doctype html><link rel="stylesheet" href="/github.css"><link rel="stylesheet" href="/syntax.css"><link rel="stylesheet" href="/viewer.css"><pre>${escape(text)}</pre><script src="/content.js"></script>`});
     }else{
-      const name=path.slice(1);assert.ok(['options.html','options.js','options.css','content.js','github.css','syntax.css','viewer.css'].includes(name),name);
-      await route.fulfill({contentType:name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':'text/html',body:await readFile(join(dist,name))});
+      const name=path.slice(1);assert.ok(['options.html','options.js','options.css','content.js','github.css','syntax.css','viewer.css','icon.png'].includes(name),name);
+      await route.fulfill({contentType:name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':name.endsWith('.png')?'image/png':'text/html',body:await readFile(join(dist,name))});
     }
   });
   const options=await context.newPage();await options.goto('https://sideband.test/options.html');
@@ -96,18 +96,24 @@ try {
   await page.getByRole('textbox',{name:'New comment',exact:true}).fill('Must not be saved');
   await page.getByRole('button',{name:'Add comment',exact:true}).click();
   await page.locator('#sideband-comments [role="status"]').filter({hasText:'Document changed'}).waitFor();
-  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.reload();
   await page.locator('#sideband-document').filter({hasText:'Document changed externally.'}).waitFor();
   assert.equal(await page.locator('.sideband-thread').count(),1);
+  await page.getByRole('button',{name:'Resolve',exact:true}).click();
+  await page.locator('.sideband-thread-state').filter({hasText:'Resolved'}).waitFor();
+  await page.getByRole('button',{name:'Hide Resolved',exact:true}).click();
+  assert.equal(await page.locator('.sideband-thread').count(),0);
+  await page.getByRole('button',{name:'Show Resolved',exact:true}).click();
+  assert.equal(await page.locator('.sideband-thread').count(),1);
+  console.log('PASS Resolve uses the shared store and filtering hides only resolved threads');
   const blocked=await relay({id:'forged',type:'settings.save',roots:['/'],author:'attacker'},pathToFileURL(file).href);
   assert.equal(blocked.ok,false);assert.match(blocked.error,/settings/i);
   await page.setViewportSize({width:680,height:900});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await page.getByRole('button',{name:'Toggle contents',exact:true}).click();
   assert.equal(await page.locator('#sideband-toc').isVisible(),true);
-  await page.getByRole('button',{name:'Toggle contents',exact:true}).click();
-  assert.equal(await page.locator('#sideband-toc').isVisible(),false);
-  console.log('PASS stale-write rejection, manual refresh, unauthorized settings rejection and narrow-screen layout');
+  assert.equal(await page.getByRole('button',{name:'Refresh',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Toggle contents',exact:true}).count(),0);
+  console.log('PASS stale-write rejection, tab reload, unauthorized settings rejection and narrow-screen layout');
 } finally {
   if(browser) await browser.close();
   await rm(temp,{recursive:true,force:true});

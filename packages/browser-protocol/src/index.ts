@@ -16,6 +16,7 @@ export type Request = { id: string } & (
   | { type: 'document.read'; url: string }
   | { type: 'thread.create'; url: string; version: string; start: number; end: number; body: string }
   | { type: 'thread.reply'; url: string; version: string; threadId: string; body: string }
+  | { type: 'thread.resolve'; url: string; version: string; threadId: string }
 );
 export type Result = Settings | DocumentSnapshot;
 export type Response = { id: string; ok: true; value: Result } | { id: string; ok: false; error: string };
@@ -35,11 +36,12 @@ export function parseRequest(value: unknown): Request {
   try { url = new URL(value.url as string); } catch { return fail(); }
   if (url.protocol !== 'file:' || (url.hostname && url.hostname !== 'localhost') || url.search || url.hash) return fail();
   if (value.type === 'document.read') return value as Request;
-  if (typeof value.version !== 'string' || !/^[a-f0-9]{64}$/.test(value.version) || !string(value.body, 16_000)) return fail();
+  if (typeof value.version !== 'string' || !/^[a-f0-9]{64}$/.test(value.version)) return fail();
+  if (value.type !== 'thread.resolve' && !string(value.body, 16_000)) return fail();
   if (value.type === 'thread.create') {
     if (!Number.isSafeInteger(value.start) || !Number.isSafeInteger(value.end) || (value.start as number) < 0 || (value.end as number) <= (value.start as number)) return fail();
     return value as Request;
   }
-  if (value.type === 'thread.reply' && typeof value.threadId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.threadId) && !value.threadId.includes('..')) return value as Request;
+  if ((value.type === 'thread.reply' || value.type === 'thread.resolve') && typeof value.threadId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.threadId) && !value.threadId.includes('..')) return value as Request;
   return fail();
 }

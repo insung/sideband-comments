@@ -53,7 +53,7 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
   let updated: ThreadState | undefined;
   if (request.type !== 'document.read') {
     if (!config.author.trim()) throw new Error('Set your author name in extension settings.');
-    if (request.version !== version) throw new Error('Document changed. Refresh the viewer before commenting.');
+    if (request.version !== version) throw new Error('Document changed. Reload this Markdown tab before commenting.');
     if (request.type === 'thread.create') {
       const anchor = captureAnchor(source, request.start, request.end);
       if (!anchor.exact.trim()) throw new Error('Select nonblank text.');
@@ -61,9 +61,9 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
     } else {
       const thread = await service.get(request.threadId);
       if (thread.documentPath !== access.path || thread.deleted) throw new Error('Thread does not belong to this document.');
-      if (thread.status === 'resolved') throw new Error('This thread is resolved. Reopen it in an editor before replying.');
-      if (resolveAnchor(source, thread.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
-      updated = await service.reply(thread.id, request.body);
+      if (thread.status === 'resolved') throw new Error(request.type === 'thread.resolve' ? 'This thread is already resolved.' : 'This thread is resolved. Reopen it in an editor before replying.');
+      if (request.type === 'thread.reply' && resolveAnchor(source, thread.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
+      updated = request.type === 'thread.resolve' ? await service.resolve(thread.id) : await service.reply(thread.id, request.body);
     }
   }
   const snapshot: DocumentSnapshot = {
@@ -73,21 +73,29 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
   encodeMessage({ id: request.id, ok: true, value: snapshot });
   if (staged.length) {
     const current = await readFile(access.file, 'utf8');
-    if (createHash('sha256').update(current).digest('hex') !== version) throw new Error('Document changed. Refresh the viewer before commenting.');
+    if (createHash('sha256').update(current).digest('hex') !== version) throw new Error('Document changed. Reload this Markdown tab before commenting.');
     await assertStoreSafe(access.root);
     for (const event of staged) await repository.append(event, async currentEvents => {
       // Another editor can hold the lock while the document or thread changes.
       const liveConfig = await loadConfig(configPath);
       const liveAccess = await documentAccess(request.url, liveConfig.roots);
-      if (liveAccess.root !== access.root || liveAccess.file !== access.file) throw new Error('Project access changed. Refresh the viewer.');
+      if (liveAccess.root !== access.root || liveAccess.file !== access.file) throw new Error('Project access changed. Reload this Markdown tab.');
       await assertStoreSafe(access.root);
       const liveSource = await readFile(liveAccess.file, 'utf8');
-      if (createHash('sha256').update(liveSource).digest('hex') !== version) throw new Error('Document changed. Refresh the viewer before commenting.');
-      if (request.type === 'thread.reply') {
+      if (createHash('sha256').update(liveSource).digest('hex') !== version) throw new Error('Document changed. Reload this Markdown tab before commenting.');
+      if (request.type === 'thread.reply' || request.type === 'thread.resolve') {
         const current = foldThread(currentEvents);
         if (current.deleted || current.documentPath !== access.path) throw new Error('Thread does not belong to this document.');
-        if (current.status === 'resolved') throw new Error('This thread is resolved. Reopen it in an editor before replying.');
-        if (resolveAnchor(liveSource, current.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
+        if (current.status === 'resolved') throw new Error(request.type === 'thread.resolve' ? 'This thread is already resolved.' : 'This thread is resolved. Reopen it in an editor before replying.');
+        if (request.type === 'thread.reply' && resolveAnchor(liveSource, current.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
+        if (request.type === 'thread.resolve') {
+          // Preserve replies committed while this resolve waited for the shared lock.
+          event.revision = current.revision + 1;
+          const resolved = foldThread([...currentEvents, event]);
+          snapshot.threads = snapshot.threads.map(entry => entry.thread.id === resolved.id
+            ? { thread: resolved, resolution: resolveAnchor(liveSource, resolved.anchor) } : entry);
+          encodeMessage({ id: request.id, ok: true, value: snapshot });
+        }
       }
     });
   }

@@ -120,3 +120,103 @@ it('rechecks resolved thread state after acquiring a contended storage lock', as
   const actual=(await new JsonlThreadRepository(root).list())[0]!;
   expect(actual.status).toBe('resolved');expect(actual.comments).toHaveLength(1);
 });
+
+
+const resolveRequest = (snapshot: any, threadId = snapshot.threads[0].thread.id) => ({
+  type: 'thread.resolve', url: pathToFileURL(file).href, version: snapshot.version, threadId
+});
+
+it('resolves through the shared append-only store and preserves Markdown and comments', async () => {
+  const created = await create();
+  const repository = new JsonlThreadRepository(root);
+  const directory = join(root, '.comments', 'documents');
+  const [bundle] = await readdir(directory);
+  const before = await readFile(join(directory, bundle!), 'utf8');
+  const resolved: any = await call(resolveRequest(created));
+  expect(resolved.threads[0].thread.status).toBe('resolved');
+  expect(resolved.threads[0].thread.comments[0].body).toBe('Please clarify');
+  expect((await repository.listByDocument('한글 문서.md'))[0]?.status).toBe('resolved');
+  expect((await read()).threads[0].thread.status).toBe('resolved');
+  const after = await readFile(join(directory, bundle!), 'utf8');
+  expect(after.startsWith(before)).toBe(true);
+  expect(JSON.parse(after.slice(before.length)).type).toBe('thread.resolved');
+  expect(await readFile(file, 'utf8')).toBe(source);
+  await expect(call(resolveRequest(created))).rejects.toThrow(/resolved/i);
+  await expect(call({ type: 'thread.reply', url: pathToFileURL(file).href, version: created.version, threadId: created.threads[0].thread.id, body: 'Late reply' })).rejects.toThrow(/resolved/i);
+});
+
+it('rejects stale resolve and resolve belonging to a different document or deleted thread', async () => {
+  const created = await create();
+  await writeFile(file, source + 'Changed');
+  await expect(call(resolveRequest(created))).rejects.toThrow(/Reload this Markdown tab/i);
+  const second = join(root, 'second.md'); await writeFile(second, source + 'Changed');
+  const snapshot: any = await call({ type: 'document.read', url: pathToFileURL(second).href });
+  await expect(call({ ...resolveRequest(snapshot, created.threads[0].thread.id), url: pathToFileURL(second).href })).rejects.toThrow(/document/i);
+  const service = new CommentService(new JsonlThreadRepository(root), { actor: () => ({ id: 'test', name: 'Editor' }), id: randomUUID, now: () => new Date().toISOString() });
+  await service.delete(created.threads[0].thread.id);
+  await expect(call(resolveRequest(await read(), created.threads[0].thread.id))).rejects.toThrow(/document/i);
+  expect((await new JsonlThreadRepository(root).readEvents(created.threads[0].thread.id)).map(event => event.type)).toEqual(['thread.created', 'thread.deleted']);
+});
+
+it('can resolve an orphaned thread without modifying its anchor', async () => {
+  const created = await create();
+  const changed = source.replace('precise phrase', 'different wording');
+  await writeFile(file, changed);
+  const snapshot = await read();
+  const resolved: any = await call(resolveRequest(snapshot));
+  expect(resolved.threads[0].thread.status).toBe('resolved');
+  expect(resolved.threads[0].resolution.kind).not.toBe('resolved');
+  expect(resolved.threads[0].thread.anchor).toEqual(created.threads[0].thread.anchor);
+  expect(await readFile(file, 'utf8')).toBe(changed);
+});
+
+it.each(['source', 'resolved', 'deleted', 'relocated', 'access'])('rechecks %s changes while resolve waits for the store lock', async change => {
+  const created = await create(); const thread = created.threads[0].thread;
+  const lock = join(root, '.comments', 'store.lock'); await writeFile(lock, 'other-writer');
+  let signal!: () => void; const entered = new Promise<void>(resolve => { signal = resolve; });
+  const original = JsonlThreadRepository.prototype.append;
+  vi.spyOn(JsonlThreadRepository.prototype, 'append').mockImplementation(function(...args) { signal(); return original.apply(this, args); });
+  const result = call(resolveRequest(created));
+  const rejected = expect(result).rejects.toThrow(change === 'source' ? /Reload this Markdown tab/i : change === 'access' ? /registered|outside/i : change === 'resolved' ? /resolved/i : /document/i);
+  await entered;
+  if (change === 'source') await writeFile(file, source + 'Changed under lock');
+  else if (change === 'access') {
+    const elsewhere = join(temp, 'elsewhere'); await mkdir(elsewhere);
+    await writeFile(config, JSON.stringify({ extensionId: 'a'.repeat(32), roots: [elsewhere], author: 'Local reviewer' }));
+  }
+  else {
+    const base = { eventId: randomUUID(), threadId: thread.id, revision: thread.revision + 1, occurredAt: new Date().toISOString(), actor: { id: 'editor', name: 'Other editor' } };
+    const event = change === 'resolved' ? createEventFactory.resolved(base) : change === 'deleted' ? createEventFactory.deleted(base) : createEventFactory.relocated({ ...base, documentPath: 'second.md' });
+    const directory = join(root, '.comments', 'documents'); const [bundle] = await readdir(directory);
+    await appendFile(join(directory, bundle!), JSON.stringify(event) + '\n');
+  }
+  await rm(lock); await rejected;
+  expect((await new JsonlThreadRepository(root).readEvents(thread.id)).filter(event => event.type === 'thread.resolved')).toHaveLength(change === 'resolved' ? 1 : 0);
+});
+
+
+it.each([false, true])('accounts for a concurrent reply before resolving (oversized response: %s)', async oversized => {
+  const created = await create(); const thread = created.threads[0].thread;
+  const lock = join(root, '.comments', 'store.lock'); await writeFile(lock, 'other-writer');
+  let signal!: () => void; const entered = new Promise<void>(resolve => { signal = resolve; });
+  const original = JsonlThreadRepository.prototype.append;
+  vi.spyOn(JsonlThreadRepository.prototype, 'append').mockImplementation(function(...args) { signal(); return original.apply(this, args); });
+  const result = call(resolveRequest(created));
+  const outcome = result.then(value => ({ value }), error => ({ error }));
+  await entered;
+  const event = createEventFactory.replied({ eventId: randomUUID(), threadId: thread.id, revision: thread.revision + 1, occurredAt: new Date().toISOString(), actor: { id: 'editor', name: 'Other editor' }, body: oversized ? 'x'.repeat(1024 * 1024) : 'Concurrent reply' });
+  const directory = join(root, '.comments', 'documents'); const [bundle] = await readdir(directory);
+  await appendFile(join(directory, bundle!), JSON.stringify(event) + '\n'); await rm(lock);
+  const actual = await outcome;
+  const stored = (await new JsonlThreadRepository(root).list())[0]!;
+  if (oversized) {
+    expect('error' in actual && actual.error.message).toMatch(/large|limit/i);
+    expect(stored.status).toBe('open');
+  } else {
+    expect('value' in actual && (actual.value as any).threads[0].thread.comments.map((comment: any) => comment.body)).toEqual(['Please clarify', 'Concurrent reply']);
+    expect(stored.status).toBe('resolved');
+    expect(stored.comments.map(comment => comment.body)).toEqual(['Please clarify', 'Concurrent reply']);
+    expect(stored.revision).toBe(thread.revision + 2);
+  }
+  expect(await readFile(file, 'utf8')).toBe(source);
+});
