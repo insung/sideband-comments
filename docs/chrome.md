@@ -64,6 +64,9 @@ Resolved threads are readable but do not accept replies. Orphaned or ambiguous a
 - **Refresh** explicitly reloads the document and comments from disk. There is no autoreload or background polling.
 - If a document changes while you are reading it, a comment/reply using the old version is refused. Click **Refresh**, then select again.
 - The center column is at most 1200px wide. On narrower screens the TOC can be toggled; on small screens comments move below the document.
+- Drag the divider beside either side panel to adjust its width, or focus the divider and use Left/Right (Home/End for its limits). Chrome remembers these widths locally across documents and tabs. Widths are constrained to keep the article readable; narrow screens keep the stacked layout.
+- A closed YAML frontmatter block at the start of a file is hidden from the article and table of contents. The original Markdown and comment anchor offsets stay unchanged.
+- Open Settings from the extension icon or Chrome's extension details page. The comment panel contains no Settings button.
 - Local files up to 256 KiB and comment bodies up to 16,000 characters are supported. Very large comment histories may exceed Chrome Native Messaging's 1 MiB response limit; the host reports this instead of emitting a corrupt frame.
 - Supported extensions: `.md`, `.markdown`, `.mdown`, `.mkdn`, `.mkd`.
 - GitHub-style Markdown tables and strikethrough, Mermaid, and common code languages are supported. Unknown code languages remain readable without highlighting.

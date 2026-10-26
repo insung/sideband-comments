@@ -1,10 +1,9 @@
 import type { DocumentSnapshot } from '@sideband-comments/browser-protocol';
 
-interface Actions { create(body: string): Promise<void>; reply(id: string, body: string): Promise<void>; settings(): void }
+interface Actions { create(body: string): Promise<void>; reply(id: string, body: string): Promise<void> }
 export function createCommentPanel(document: Document, actions: Actions) {
   const element = document.createElement('aside'); element.id = 'sideband-comments'; element.setAttribute('aria-label', 'Sideband comments');
   const heading = document.createElement('h2'); heading.textContent = 'Sideband Comments';
-  const settings = document.createElement('button'); settings.type = 'button'; settings.textContent = 'Settings'; settings.addEventListener('click', actions.settings);
   const status = document.createElement('p'); status.setAttribute('role','status'); status.className='sideband-status'; status.textContent='Connecting to the local comment store…';
   const form = document.createElement('form'); form.className='sideband-compose';
   const selection = document.createElement('blockquote'); selection.textContent='Select text in one paragraph to add a comment.';
@@ -13,7 +12,7 @@ export function createCommentPanel(document: Document, actions: Actions) {
   const submit = document.createElement('button'); submit.type='submit'; submit.textContent='Add comment'; submit.dataset.action='create'; submit.disabled=true;
   form.append(selection,label,submit);
   const list = document.createElement('div'); list.className='sideband-threads';
-  element.append(heading,settings,status,form,list);
+  element.append(heading,status,form,list);
   let ready=false, selected=false, busy=false;
   const update = () => {
     submit.disabled=!ready || !selected || busy;

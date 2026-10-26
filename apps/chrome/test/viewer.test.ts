@@ -10,6 +10,22 @@ function rendered(source: string) {
   return { output, document: dom.window.document };
 }
 describe('browser Markdown renderer', () => {
+  it.each(['\n', '\r\n'])('hides leading YAML metadata and preserves source offsets with %j newlines', newline => {
+    const source = '\uFEFF' + ['---', 'title: Metadata title', 'tags: [example]', '---', '# Real heading', '', 'Review this phrase now.', ''].join(newline);
+    const { output, document } = rendered(source);
+    expect(output.toc.map(x => x.title)).toEqual(['Real heading']);
+    expect(document.body.textContent).not.toContain('Metadata title');
+    const paragraph = document.querySelector('p')!;
+    const range = document.createRange(); range.setStart(paragraph.firstChild!, 7); range.setEnd(paragraph.firstChild!, 18);
+    const selected = selectionOffsets(source, range);
+    expect(selected).toEqual({ start: source.indexOf('this phrase'), end: source.indexOf('this phrase') + 11 });
+  });
+  it('accepts a YAML end marker but preserves unclosed metadata and later horizontal rules', () => {
+    expect(rendered('---\ntitle: Hidden\n...\n# Heading\n').output.toc.map(x => x.title)).toEqual(['Heading']);
+    expect(rendered('---\ntitle: Hidden\n...\n# Heading\n').document.body.textContent).not.toContain('title: Hidden');
+    expect(rendered('---\ntitle: Visible\n').document.body.textContent).toContain('title: Visible');
+    expect(rendered('# Heading\n\n---\n\nVisible\n').document.querySelector('hr')).not.toBeNull();
+  });
   it('renders GFM, unique heading anchors, source lines, code highlighting and Mermaid containers', () => {
     const { output, document } = rendered('# Title\n\n## Same\n\n## Same\n\n|A|B|\n|-|-|\n|1|2|\n\n```js\nconst x = 1;\n```\n\n```mermaid\ngraph TD; A-->B\n```\n');
     expect(output.toc.map(x => x.id)).toEqual(['title','same','same-2']);

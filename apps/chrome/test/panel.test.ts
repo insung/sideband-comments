@@ -6,8 +6,9 @@ describe('comment panel', () => {
   it('requires a selection, submits a comment and keeps comment HTML inert', async () => {
     const dom = new JSDOM('<body></body>'); const doc=dom.window.document;
     const create=vi.fn(async()=>{});
-    const panel=createCommentPanel(doc,{create,reply:async()=>{},settings:()=>{}});
+    const panel=createCommentPanel(doc,{create,reply:async()=>{}});
     doc.body.append(panel.element);
+    expect([...panel.element.querySelectorAll('button')].some(button => button.textContent === 'Settings')).toBe(false);
     const submit=panel.element.querySelector<HTMLButtonElement>('[data-action="create"]')!;
     expect(submit.disabled).toBe(true);
     panel.show({source:'hello',version:'a'.repeat(64),path:'doc.md',projectRoot:'/project',threads:[]});

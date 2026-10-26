@@ -20,7 +20,17 @@ export function renderMarkdown(source: string): { html: string; toc: TocEntry[] 
   const lines = source.split('\n');
   const lineOffsets: number[] = [0];
   for (const line of lines) lineOffsets.push(lineOffsets[lineOffsets.length - 1]! + line.length + 1);
-  const tokens = md.parse(source, {});
+  // Blank metadata in place so token line maps still refer to the untouched file.
+  // Slicing it away would shift every later comment anchor.
+  let renderSource = source;
+  if (/^\uFEFF?---[\t ]*\r?$/.test(lines[0] || '')) {
+    const end = lines.findIndex((line, index) => index > 0 && /^(---|\.\.\.)[\t ]*\r?$/.test(line));
+    if (end > 0) {
+      const offset = lineOffsets[end + 1] ?? source.length;
+      renderSource = source.slice(0, offset).replace(/[^\r\n]/g, ' ') + source.slice(offset);
+    }
+  }
+  const tokens = md.parse(renderSource, {});
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]!;
     if (token.map && ['paragraph_open', 'list_item_open', 'heading_open'].includes(token.type)) {
