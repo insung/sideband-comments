@@ -136,7 +136,8 @@ export class JsonlThreadRepository {
     }
   }
 
-  async append(event: ThreadEvent): Promise<void> {
+  /** Optional validation runs after acquiring the shared lock, immediately before the append. */
+  async append(event: ThreadEvent, beforeAppend?: (currentEvents: readonly ThreadEvent[]) => Promise<void>): Promise<void> {
     assertThreadId(event.threadId);
     await this.withLock(event.threadId, async () => {
       const snapshot = await this.snapshot();
@@ -153,6 +154,7 @@ export class JsonlThreadRepository {
       const file = snapshot.bundles.get(event.threadId)
         ?? this.bundleFor(path, snapshot)
         ?? join(this.documentsDirectory, `${randomUUID()}.jsonl`);
+      await beforeAppend?.(previous);
       await this.writeEvents(file, snapshot.bundles.has(event.threadId) ? [event] : [...previous, event]);
     });
   }

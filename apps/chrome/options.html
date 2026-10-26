@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sideband Comments settings</title><link rel="stylesheet" href="options.css"></head>
+<body>
+<main>
+<h1>Sideband Comments</h1>
+<p>Register local project folders and the name shown on your comments. Markdown files stay unchanged; comments are saved in each project's <code>.comments</code> folder.</p>
+<p>First install the Native Messaging host using the instructions in <code>docs/chrome.md</code>. In Chrome's extension details, enable <strong>Allow access to file URLs</strong>.</p>
+<form>
+<label for="roots">Project folders (one absolute path per line)</label>
+<textarea id="roots" rows="5" required spellcheck="false" placeholder="/Users/your-name/Documents/my-project"></textarea>
+<p>Choose the same project root used by VS Code or Obsidian so all clients share one comment store.</p>
+<label for="author">Author name</label><input id="author" maxlength="100" required autocomplete="name">
+<button type="submit">Save settings</button>
+</form>
+<p role="status" aria-live="polite">Connecting to the local host…</p>
+<p>Only registered folders are available to the local host. Files and comments are processed on your computer. This extension does not upload documents.</p>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

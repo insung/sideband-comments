@@ -5,6 +5,9 @@
     { "path": "packages/jsonl-store" },
     { "path": "packages/migrate" },
     { "path": "apps/vscode" },
-    { "path": "apps/obsidian" }
+    { "path": "apps/obsidian" },
+    { "path": "packages/browser-protocol" },
+    { "path": "apps/native-host" },
+    { "path": "apps/chrome" }
   ]
 }

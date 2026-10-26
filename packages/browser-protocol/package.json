@@ -1,0 +1,8 @@
+{
+  "name": "@sideband-comments/browser-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": { "@sideband-comments/core": "0.1.0" }
+}

@@ -1,0 +1,121 @@
+# Chrome Markdown reader
+
+Sideband Comments can read local Markdown in Chrome with a GitHub light theme, a left table of contents, Mermaid diagrams, syntax highlighting, and a right comment panel. Comments use the same `.comments/` store as VS Code, Obsidian and the agent tool. VS Code does not have to be running.
+
+This first version targets **macOS + desktop Chrome**. It uses an unpacked Chrome extension and a small **Native Messaging** program running on Node.js 20 or newer. No web server, cloud account or continuously running daemon is needed. Chrome starts the local program when a request needs it.
+
+## Install on macOS
+
+Keep this checkout in a stable directory: the local registration points to the bundled host inside it. Run these commands from the repository root on the branch containing the Chrome reader:
+
+```sh
+node --version
+npm ci
+npm run build
+```
+
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Click **Load unpacked** and choose `apps/chrome/dist` inside the checkout.
+3. Open the extension's **Details** and enable **Allow access to file URLs**.
+4. Copy its extension ID. The checked-in development key makes it stable; the expected ID is also in `apps/chrome/dist/extension-id.txt`.
+5. Register the local program using that actual ID:
+
+```sh
+node apps/native-host/scripts/install.mjs --extension-id YOUR_32_LETTER_EXTENSION_ID
+```
+
+The installer records the absolute path of the Node executable running it. If you replace Node or move the checkout, rebuild and run the registration command again. It preserves existing project and author settings. Rebuilds do not modify your Markdown or comment history.
+
+6. Click the Sideband Comments extension icon to open **Settings**. Enter the absolute project folder containing your Markdown and `.comments`, and your author name. You can register multiple project folders, one per line. Click **Save settings**.
+7. Drag a `.md` file from that folder into Chrome, or use **File → Open File**. Existing tabs need reloading after installing/updating the extension.
+
+You can also set the first project and author while registering the host:
+
+```sh
+node apps/native-host/scripts/install.mjs --extension-id YOUR_32_LETTER_EXTENSION_ID \
+  --project "/Users/your-name/Documents/my-project" --author "Your name"
+```
+
+Choose the same project root as your other Sideband clients. For an Obsidian vault, use the vault root. A missing `.comments` store is created only when you write your first comment. Nested registered roots use the most specific matching root. Open files through their real project path; files reached through escaping symlinks and symlinked comment stores are refused.
+
+The registration files are:
+
+- `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.sideband_comments.chrome.json`
+- `~/Library/Application Support/Sideband Comments/chrome-host.sh`
+- `~/Library/Application Support/Sideband Comments/chrome-host.json`
+
+The last file contains project paths, author name, and the allowed extension ID. It contains no online service credentials.
+
+## Comment on a document
+
+1. Select text inside one paragraph or list item. Its exact quote appears above **New comment** on the right.
+2. Enter your comment and click **Add comment**.
+3. Enter a **Reply** under an open thread and click **Send reply**.
+4. Reload the tab to confirm persistence, or inspect the same document in your existing Sideband client.
+
+Markdown files are unchanged. Events are appended to `.comments/documents/*.jsonl`; existing `.comments/threads/*.jsonl` files remain readable. Keep `.comments` synchronized with the same mechanism you already use for your project.
+
+Selection must map to exact source text. Plain paragraphs and list items without inline formatting are supported, including repeated phrases when their exact source position is known. Paragraphs containing links, bold/italic text, inline code, or other formatting are refused rather than guessing a source position. Use an existing editor client to comment on those passages. Multi-paragraph, table, code-block, and diagram selections are not supported in this version.
+
+Resolved threads are readable but do not accept replies. Orphaned or ambiguous anchors also do not accept replies: use an existing editor client to re-anchor or reopen them.
+
+## Refresh and limits
+
+- **Refresh** explicitly reloads the document and comments from disk. There is no autoreload or background polling.
+- If a document changes while you are reading it, a comment/reply using the old version is refused. Click **Refresh**, then select again.
+- The center column is at most 1200px wide. On narrower screens the TOC can be toggled; on small screens comments move below the document.
+- Local files up to 256 KiB and comment bodies up to 16,000 characters are supported. Very large comment histories may exceed Chrome Native Messaging's 1 MiB response limit; the host reports this instead of emitting a corrupt frame.
+- Supported extensions: `.md`, `.markdown`, `.mdown`, `.mkdn`, `.mkd`.
+- GitHub-style Markdown tables and strikethrough, Mermaid, and common code languages are supported. Unknown code languages remain readable without highlighting.
+- Raw HTML is displayed as text. Diagrams use Mermaid's strict security mode. Comment bodies are displayed as text.
+- There is no emoji conversion, MathJax, theme selector, remote-web-document support, comment edit/delete/resolve UI, browser store publication, or automatic updater.
+
+Markdown and comments are not uploaded by Sideband Comments. Markdown can contain external links or image URLs; normal browser requests for those resources still follow Chrome's network settings. The extension only renders `file:` Markdown tabs. The local host only reads Markdown inside registered projects and writes their comment stores. Project registration is accepted from the extension settings page, never from document content.
+
+## Troubleshooting
+
+**The file is still plain text:** verify the extension is loaded, the file URL toggle is enabled, and the filename has a supported extension. Reload the tab. Managed Chrome policies may prohibit unpacked extensions or file URLs; those policies require your administrator's supported configuration.
+
+**The viewer loads but comments do not:** install the native host, check that its manifest allows the ID actually shown in `chrome://extensions`, and use Settings to register the project. If the native host exits, check that the registered Node executable and checkout still exist. Rebuild and rerun the installer after moving them.
+
+**Settings cannot connect:** both the extension and native host must come from the same checkout/build. A native host installed for another Chrome profile/product may not be found. Chrome Beta/Canary, other Chromium browsers and Windows are outside the first supported installation path.
+
+**Comment storage is locked:** stop other writers and follow the existing Sideband store-lock guidance. Do not remove the lock while an editor or host is writing.
+
+## Remove
+
+Close the document tabs, remove the extension in `chrome://extensions`, then run from this checkout:
+
+```sh
+node apps/native-host/scripts/install.mjs --remove
+```
+
+This removes the Chrome registration and launcher. It preserves saved settings and all project `.comments` history. To erase the remaining local settings, remove only the `Sideband Comments` folder listed above after checking you no longer need its project/author configuration.
+
+## Build and validation
+
+From the repository root:
+
+```sh
+npm run typecheck
+npm test
+npm run build
+npm run package --workspace apps/chrome
+```
+
+The archive is `apps/chrome/dist/sideband-comments-chrome.zip`. Extract it before using **Load unpacked**. The native host is installed separately using the instructions above.
+
+Browser checks use a separately installed Chromium executable; `playwright-core` does not download a browser:
+
+```sh
+CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:ui --workspace apps/chrome
+CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser --workspace apps/chrome
+```
+
+`test:ui` renders the actual built reader/settings scripts in Chromium, runs the built background authorization code through a test transport, and talks to the real bundled native-host subprocess using framed stdin/stdout. It covers Mermaid SVG output, selection, create/reply, reload persistence, the existing Python reader, stale writes, and a narrow viewport. **It does not prove that Chrome loaded the extension or found a native-host registration.**
+
+`test:browser` additionally loads the unpacked extension and uses Chrome's actual Native Messaging API. This isolated test runs on **Linux only**, with a temporary Chromium native-host registration. It refuses macOS/Windows before launching a browser so it cannot discover or alter an existing user installation. It requires an unmanaged Chromium permitting unpacked extensions and local file access. The production installer defaults to macOS Chrome; use the manual macOS installation checks above. The cloud environment's managed Chromium blocks unpacked extensions and file URLs, so this check was blocked there. Actual macOS Chrome installation and cross-editor UI verification remain manual delivery checks.
+
+## Reuse and licensing
+
+The layout and workflow are inspired by [simov/markdown-viewer](https://github.com/simov/markdown-viewer). Its application code and icons are not copied. This reader uses markdown-it, Mermaid, Prism, and github-markdown-css directly. Builds emit `THIRD_PARTY_NOTICES.txt` containing the project license and notices for actual bundled code and copied styles. Keep that file with distributed extension builds.

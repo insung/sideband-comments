@@ -1,0 +1,16 @@
+{
+  "name": "sideband-comments-native-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --format=cjs --outfile=dist/host.cjs",
+    "install:host": "node scripts/install.mjs",
+    "uninstall:host": "node scripts/install.mjs --remove"
+  },
+  "dependencies": {
+    "@sideband-comments/core": "0.1.0",
+    "@sideband-comments/jsonl-store": "0.1.0",
+    "@sideband-comments/browser-protocol": "0.1.0"
+  }
+}
