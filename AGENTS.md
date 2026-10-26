@@ -39,9 +39,9 @@ git status --porcelain
 
 형식은 아래 「VS Code 배포」 4번을 따른다. `### Verification` 에는 실제로 통과한 결과만 쓴다. Obsidian GitHub Release 본문에도 같은 버전의 항목을 붙인다.
 
-### 버전은 두 앱과 플러그인을 같은 번호로, 릴리즈마다 한 번만 올린다
+### 공통 버전은 릴리즈마다 한 번만 올린다
 
-VS Code 확장, Obsidian 플러그인, 에이전트 플러그인은 **항상 같은 버전 번호**를 쓴다. 한쪽만 바뀐 릴리즈도 모두 함께 올린다. 두 버전이 다르면 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
+Chrome·VS Code·Obsidian·에이전트 플러그인은 릴리즈마다 동일한 버전 번호를 사용한다. 한쪽만 바뀐 릴리즈도 모두 함께 올린다. 기존 앱·플러그인의 버전 불일치는 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
 
 새 번호는 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호다. 사용자가 릴리즈를 지시해 CHANGELOG 를 쓸 때 **한 번** 올린다. 기능 작업 중에는 올리지 않고, 로컬 검증은 지금 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
 

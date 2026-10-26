@@ -5,6 +5,8 @@ interface Actions {
   reply(id: string, body: string): Promise<void>;
   resolve(id: string): Promise<void>;
   reveal(id: string): void;
+  edit(threadId: string, commentId: string, body: string, expectedRevision: number): Promise<void>;
+  delete(threadId: string, commentId: string, expectedRevision: number): Promise<void>;
 }
 
 export function createCommentPanel(document: Document, actions: Actions) {
@@ -13,7 +15,6 @@ export function createCommentPanel(document: Document, actions: Actions) {
   const heading = document.createElement('h2'); heading.textContent = 'Sideband Comments';
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.className = 'sideband-status';
   status.textContent = 'Connecting to the local comment store…';
-  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.dataset.action = 'toggle-resolved';
   const form = document.createElement('form'); form.className = 'sideband-compose';
   const selection = document.createElement('blockquote');
   const selectionHelp = document.createElement('p'); selectionHelp.className = 'sideband-selection-help'; selectionHelp.id = 'sideband-selection-help';
@@ -23,11 +24,13 @@ export function createCommentPanel(document: Document, actions: Actions) {
   submit.setAttribute('aria-describedby', selectionHelp.id);
   form.append(selection, label, selectionHelp, submit);
   const list = document.createElement('div'); list.className = 'sideband-threads';
-  element.append(heading, status, toggle, form, list);
+  element.append(heading, status, form, list);
   let ready = false, selected = false, busy = false, hideResolved = false;
   let selectionExplanation = 'Select text in one paragraph to add a comment.';
   let current: DocumentSnapshot | undefined;
   const drafts = new Map<string, string>();
+  const edits = new Map<string, {body: string; revision: number}>();
+  const deletions = new Map<string, number>();
   const update = () => {
     submit.disabled = !ready || !selected || busy;
     selectionHelp.textContent = !ready ? 'Comments are unavailable until the local comment store is connected.' : busy ? 'Saving comment changes…' : selectionExplanation;
@@ -37,9 +40,6 @@ export function createCommentPanel(document: Document, actions: Actions) {
       button.disabled = button.dataset.blocked === 'true' || (button.dataset.action !== 'reveal' && (!ready || busy));
     }
     for (const textarea of list.querySelectorAll<HTMLTextAreaElement>('textarea')) textarea.disabled = !ready || busy || textarea.dataset.blocked === 'true';
-    toggle.textContent = hideResolved ? 'Show Resolved' : 'Hide Resolved';
-    toggle.setAttribute('aria-pressed', String(hideResolved));
-    toggle.disabled = !current;
   };
   const failure = (error: unknown) => { status.textContent = error instanceof Error ? error.message : String(error); status.dataset.error = 'true'; };
   const describe = () => {
@@ -60,6 +60,10 @@ export function createCommentPanel(document: Document, actions: Actions) {
     for (const article of list.querySelectorAll<HTMLElement>('[data-thread-id]')) {
       const reply = article.querySelector<HTMLTextAreaElement>('[name="reply"]');
       if (reply) drafts.set(article.dataset.threadId!, reply.value);
+      for (const entry of article.querySelectorAll<HTMLElement>('[data-comment-id]')) {
+        const input=entry.querySelector<HTMLTextAreaElement>('[name="edit"]'), edit=edits.get(entry.dataset.commentId!);
+        if (input && edit) edit.body=input.value;
+      }
     }
   };
   const render = () => {
@@ -68,6 +72,7 @@ export function createCommentPanel(document: Document, actions: Actions) {
     const focusedThread = active?.closest<HTMLElement>('[data-thread-id]')?.dataset.threadId;
     const focusedReply = focusedThread && active instanceof document.defaultView!.HTMLTextAreaElement ? active : undefined;
     const selectionStart = focusedReply?.selectionStart, selectionEnd = focusedReply?.selectionEnd;
+    const focusedComment = focusedReply?.closest<HTMLElement>('[data-comment-id]')?.dataset.commentId;
     list.replaceChildren();
     for (const {thread, resolution} of current?.threads ?? []) {
       if (hideResolved && thread.status === 'resolved') continue;
@@ -81,10 +86,37 @@ export function createCommentPanel(document: Document, actions: Actions) {
       state.textContent = thread.status === 'resolved' ? 'Resolved' : resolution.kind === 'resolved' ? 'Open' : `Anchor ${resolution.kind}`;
       article.append(quote, state);
       for (const comment of thread.comments) {
-        const entry = document.createElement('section'); const author = document.createElement('strong'); author.textContent = comment.author.name;
+        const entry = document.createElement('section'); entry.dataset.commentId = comment.id;
+        const author = document.createElement('strong'); author.textContent = comment.author.name;
         const time = document.createElement('time'); time.dateTime = comment.createdAt; time.textContent = new Date(comment.createdAt).toLocaleString();
         const text = document.createElement('p'); text.className = 'sideband-comment-body'; text.textContent = comment.body;
         entry.append(author, time, text); article.append(entry);
+        if (current?.author && comment.author.name === current.author) {
+          const action = (name: string, title: string, run: () => void) => {
+            const button = document.createElement('button'); button.type = 'button'; button.dataset.action = name; button.textContent = title;
+            button.addEventListener('click', () => { if (!button.disabled) run(); }); entry.append(button);
+          };
+          const edit = edits.get(comment.id);
+          if (edit) {
+            const label = document.createElement('label'); label.textContent = 'Edit comment';
+            const input = document.createElement('textarea'); input.name = 'edit'; input.rows = 3; input.maxLength = 16000; input.value = edit.body;
+            input.addEventListener('input', () => { edit.body = input.value; }); label.append(input); entry.append(label);
+            action('save-edit','Save',() => {
+              edit.body = input.value;
+              if (!edit.body.trim()) { failure(new Error('Comment body cannot be blank.')); return; }
+              void perform(async()=>{ await actions.edit(thread.id,comment.id,edit.body.trim(),edit.revision); edits.delete(comment.id); render(); });
+            });
+            action('cancel-edit','Cancel',()=>{ edits.delete(comment.id); render(); });
+          } else {
+            action('edit','Edit',()=>{ edits.set(comment.id,{body:comment.body,revision:thread.revision}); deletions.delete(comment.id); render(); });
+          }
+          const deletion = deletions.get(comment.id);
+          if (deletion !== undefined) {
+            const warning = document.createElement('p'); warning.textContent = 'Delete this comment? Its saved history and other comments will remain.'; entry.append(warning);
+            action('confirm-delete','Delete comment',()=>{ void perform(async()=>{ await actions.delete(thread.id,comment.id,deletion); deletions.delete(comment.id); edits.delete(comment.id); render(); }); });
+            action('cancel-delete','Cancel',()=>{ deletions.delete(comment.id); render(); });
+          } else if (!edit) action('delete','Delete',()=>{ deletions.set(comment.id,thread.revision); render(); });
+        }
       }
       const blocked = thread.status === 'resolved' || resolution.kind !== 'resolved';
       const replyForm = document.createElement('form'); replyForm.className = 'sideband-reply';
@@ -117,15 +149,18 @@ export function createCommentPanel(document: Document, actions: Actions) {
       }
       list.append(article);
       if (focusedReply && thread.id === focusedThread) {
-        reply.focus(); reply.setSelectionRange(selectionStart!, selectionEnd!);
+        const target = focusedReply.name === 'edit'
+          ? [...article.querySelectorAll<HTMLElement>('[data-comment-id]')].find(item=>item.dataset.commentId===focusedComment)?.querySelector<HTMLTextAreaElement>('[name="edit"]')
+          : reply;
+        target?.focus(); target?.setSelectionRange(selectionStart!, selectionEnd!);
       }
     }
     update();
   };
-  toggle.addEventListener('click', () => { hideResolved = !hideResolved; render(); });
   update();
   return {
     element,
+    setHideResolved(value: boolean) { if (hideResolved !== value) { hideResolved = value; render(); } },
     select(text: string, explanation?: string) {
       selected = !!text; selection.textContent = text; selection.hidden = !text;
       selectionExplanation = explanation ?? (text ? '' : 'Select text in one paragraph to add a comment.'); update();
@@ -133,7 +168,7 @@ export function createCommentPanel(document: Document, actions: Actions) {
     error(message: string) { failure(message); },
     disconnected(message: string) { ready = false; failure(message); update(); },
     show(snapshot: DocumentSnapshot) {
-      if (current && (current.path !== snapshot.path || current.projectRoot !== snapshot.projectRoot)) { list.replaceChildren(); drafts.clear(); }
+      if (current && (current.path !== snapshot.path || current.projectRoot !== snapshot.projectRoot)) { list.replaceChildren(); drafts.clear(); edits.clear(); deletions.clear(); }
       current = snapshot; ready = true; describe(); render();
     }
   };

@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { parseRequest } from '../src/index.js';
 
 describe('browser protocol', () => {
+  it('requires a valid comment identifier, revision and edit body',()=>{
+    const request={id:'edit',type:'comment.edit',url:'file:///doc.md',version:'a'.repeat(64),threadId:'thread-1',commentId:'comment-1',expectedRevision:0,body:'Updated'};
+    expect(parseRequest(request).type).toBe('comment.edit');
+    expect(parseRequest({...request,type:'comment.delete',body:undefined}).type).toBe('comment.delete');
+    for(const patch of [{commentId:'../escape'},{expectedRevision:-1},{expectedRevision:1.5},{expectedRevision:undefined},{body:''},{body:'x'.repeat(16001)}]) expect(()=>parseRequest({...request,...patch})).toThrow();
+  });
   it('accepts typed document and write requests', () => {
     expect(parseRequest({ id: '1', type: 'document.read', url: 'file:///tmp/a.md' }).type).toBe('document.read');
     expect(parseRequest({ id: '2', type: 'thread.create', url: 'file:///tmp/a.md', version: 'a'.repeat(64), start: 0, end: 3, body: 'Review' }).type).toBe('thread.create');

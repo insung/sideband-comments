@@ -49,6 +49,14 @@ export async function createReader(document: Document, options: ReaderOptions) {
       if (!snapshot) throw new Error('Reload this Markdown tab before resolving.');
       accept(await options.request({type:'thread.resolve',version:snapshot.version,threadId}));
     },
+    edit:async (threadId,commentId,body,expectedRevision) => {
+      if (!snapshot) throw new Error('Reload this Markdown tab before editing.');
+      accept(await options.request({type:'comment.edit',version:snapshot.version,threadId,commentId,body,expectedRevision}));
+    },
+    delete:async (threadId,commentId,expectedRevision) => {
+      if (!snapshot) throw new Error('Reload this Markdown tab before deleting.');
+      accept(await options.request({type:'comment.delete',version:snapshot.version,threadId,commentId,expectedRevision}));
+    },
     reveal:threadId => {
       const entry = snapshot?.threads.find(({thread})=>thread.id===threadId);
       if (entry?.resolution.kind !== 'resolved') { panel.error('The quoted text moved or was removed. Re-anchor this thread in an editor.'); return; }
@@ -118,5 +126,5 @@ export async function createReader(document: Document, options: ReaderOptions) {
     article.replaceChildren(fallback); toc.replaceChildren();
     panel.disconnected(`Unable to render Markdown. ${error instanceof Error ? error.message : 'Reload this Markdown tab.'}`);
   }
-  return { element:layout, dispose() { document.removeEventListener('selectionchange',captureSelection); highlight(); } };
+  return { element:layout, setHideResolved:panel.setHideResolved, dispose() { document.removeEventListener('selectionchange',captureSelection); highlight(); } };
 }
