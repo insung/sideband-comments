@@ -55,6 +55,19 @@ describe('Chrome reader integration', () => {
     const sent=request.mock.calls.at(-1)![0];
     expect(snapshot.source.slice(sent.start as number,sent.end as number)).toContain('this phrase');
   });
+  it('recognizes a new document selection even when the comment composer still has focus', async () => {
+    const {doc,dom,request} = await setup('# Heading\n\nChoose this text after typing a draft.\n');
+    const body=doc.querySelector<HTMLTextAreaElement>('[name="comment"]')!;
+    body.focus(); body.value='Draft written before selecting text';
+    const range=doc.createRange(); range.selectNodeContents(doc.querySelector('#sideband-document p')!);
+    dom.window.getSelection()!.removeAllRanges(); dom.window.getSelection()!.addRange(range);
+    doc.dispatchEvent(new dom.window.Event('selectionchange'));
+    const button=doc.querySelector<HTMLButtonElement>('[data-action="create"]')!;
+    expect(button.disabled).toBe(false);
+    expect(body.value).toBe('Draft written before selecting text');
+    button.click(); await new Promise(resolve=>setTimeout(resolve,0));
+    expect(request).toHaveBeenLastCalledWith(expect.objectContaining({type:'thread.create',body:'Draft written before selecting text'}));
+  });
   it('explains stale writes without adding a Refresh button or losing the draft', async () => {
     const {doc,dom,request} = await setup('# Heading\n\nPlain text to review.\n');
     const range=doc.createRange();range.selectNodeContents(doc.querySelector('#sideband-document p')!);

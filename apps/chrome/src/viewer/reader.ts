@@ -2,7 +2,7 @@ import type { DocumentSnapshot } from '@sideband-comments/browser-protocol';
 import { createCommentPanel } from '../comments/panel.js';
 import { installPanelResizers, type PanelWidths } from './panel-widths.js';
 import { renderMarkdown } from './render.js';
-import { selectionOffsets, sourceRange, type SelectionOffsets } from './selection.js';
+import { normalizeSelectionRange, selectionOffsets, sourceRange, type SelectionOffsets } from './selection.js';
 
 interface ReaderOptions {
   request(message: Record<string, unknown>): Promise<DocumentSnapshot>;
@@ -85,12 +85,16 @@ export async function createReader(document: Document, options: ReaderOptions) {
     await options.diagrams(article);
   };
   const captureSelection = () => {
-    if (panel.element.contains(document.activeElement)) return;
     const selection = win.getSelection();
     if (!selection?.rangeCount || !article.contains(selection.anchorNode)) return;
-    if (selection.isCollapsed) { selected = undefined; highlight(); panel.select(''); return; }
+    if (selection.isCollapsed) {
+      // Typing in the composer may collapse the browser selection. Keep the
+      // pinned quote, but accept every new noncollapsed document selection.
+      if (!panel.element.contains(document.activeElement)) { selected = undefined; highlight(); panel.select(''); }
+      return;
+    }
     try {
-      const range = selection.getRangeAt(0);
+      const range = normalizeSelectionRange(selection.getRangeAt(0));
       selected = selectionOffsets(source,range);
       highlight(range.cloneRange()); panel.select(range.toString());
     } catch (error) {

@@ -38,6 +38,18 @@ export function trackInlineSource(md: MarkdownIt): void {
     }
   }
   md.inline.State = SourceState;
+  // Mirror the parser's final literal-character fallback as a tracked rule.
+  // Nested link-label parsing otherwise inherits the outer link rule's start
+  // when punctuation falls through all built-in rules.
+  md.inline.ruler.push('source_literal', (state, silent) => {
+    if (silent) return false;
+    const tracked = state as SourceState;
+    const previous = tracked.sourceRuleStart;
+    tracked.sourceRuleStart = state.pos;
+    state.pending += state.src[state.pos++]!;
+    tracked.sourceRuleStart = previous;
+    return true;
+  });
   for (const name of ['text', 'linkify', 'newline', 'escape', 'backticks', 'strikethrough', 'emphasis', 'link', 'image', 'autolink', 'html_inline', 'entity']) {
     // Ruler's public API intentionally exposes functions but not names; retain the
     // rule by name before replacing it. This adapter relies on the pinned parser's rule list.

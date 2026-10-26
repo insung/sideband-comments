@@ -144,6 +144,25 @@ describe('browser Markdown renderer', () => {
     const code = document.querySelector('code')!; range.selectNodeContents(code);
     expect(() => selectionOffsets(source,range)).toThrow(/paragraph|block/i);
   });
+  it.each(['next-text', 'next-element', 'parent'])('accepts a full paragraph with a browser-expanded trailing boundary: %s', boundary => {
+    const source='First **paragraph**.\n\nSecond paragraph.\n';
+    const {document}=rendered(source), paragraphs=document.querySelectorAll('p');
+    const range=document.createRange(); range.setStart(paragraphs[0]!.firstChild!,0);
+    if (boundary==='next-text') range.setEnd(paragraphs[1]!.firstChild!,0);
+    else if (boundary==='next-element') range.setEnd(paragraphs[1]!,0);
+    else range.setEnd(document.querySelector('main')!,2);
+    expect(selectionOffsets(source,range)).toEqual({start:0,end:20});
+  });
+  it('keeps selected whitespace content for provenance and cross-block validation', () => {
+    for (const source of ['A **&nbsp;**', 'A\n\n&nbsp;']) {
+      const {document}=rendered(source), range=document.createRange();
+      range.selectNodeContents(document.querySelector('main')!);
+      expect(()=>selectionOffsets(source,range)).toThrow();
+    }
+    const {document}=rendered('A [ ](target)');
+    const range=document.createRange(); range.selectNodeContents(document.querySelector('p')!);
+    expect(selectionOffsets('A [ ](target)',range)).toEqual({start:0,end:4});
+  });
   it('maps formatted selections by their exact source endpoints', () => {
     const source = 'A **bold** phrase.\n'; const { document } = rendered(source);
     const range = document.createRange(); range.selectNodeContents(document.querySelector('p')!);

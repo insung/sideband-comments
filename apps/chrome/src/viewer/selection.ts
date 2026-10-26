@@ -14,8 +14,31 @@ function offsetIn(block: Element, node: Node, offset: number): number {
   prefix.selectNodeContents(block); prefix.setEnd(node, offset);
   return prefix.toString().length;
 }
+/** Browser paragraph selection can end at the next block's offset zero. */
+export function normalizeSelectionRange(range: Range): Range {
+  const normalized = range.cloneRange();
+  const root = range.commonAncestorContainer;
+  const walker = root.ownerDocument!.createTreeWalker(root, 4);
+  let node: Node | null = root.nodeType === 3 ? root : walker.nextNode();
+  let first: [Node, number] | undefined, last: [Node, number] | undefined;
+  while (node) {
+    if (range.comparePoint(node, 0) > 0) break;
+    if (range.intersectsNode(node)) {
+      const start = node === range.startContainer ? range.startOffset : 0;
+      const end = node === range.endContainer ? range.endOffset : node.textContent!.length;
+      const separator = !/\S/.test(node.textContent!.slice(start, end)) && !element(node)?.closest(`${supported},${unsupported}`);
+      if (end > start && !separator) {
+        first ??= [node, start]; last = [node, end];
+      }
+    }
+    node = walker.nextNode();
+  }
+  if (first && last) { normalized.setStart(...first); normalized.setEnd(...last); }
+  return normalized;
+}
 /** Endpoints come from parser provenance; a source span may include inline syntax. */
 export function selectionOffsets(source: string, range: Range): SelectionOffsets {
+  range = normalizeSelectionRange(range);
   const startElement = element(range.startContainer), endElement = element(range.endContainer);
   const block = startElement?.closest(supported);
   if (!block || endElement?.closest(supported) !== block || startElement?.closest(unsupported) || endElement?.closest(unsupported) || block.querySelector('p,ul,ol,pre,svg,table')) {
