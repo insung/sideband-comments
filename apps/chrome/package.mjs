@@ -1,0 +1,10 @@
+import { spawnSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { rm } from 'node:fs/promises';
+const here=dirname(fileURLToPath(import.meta.url));
+const archive=join(here,'dist','sideband-comments-chrome.zip');
+await rm(archive,{force:true});
+const result=spawnSync('zip',['-j',archive,'manifest.json','icon.png','content.js','background.js','options.js','options.html','github.css','syntax.css','viewer.css','options.css','extension-id.txt','THIRD_PARTY_NOTICES.txt'],{cwd:join(here,'dist'),stdio:'inherit'});
+if(result.error) throw result.error;
+process.exitCode=result.status ?? 1;

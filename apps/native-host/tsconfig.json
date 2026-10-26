@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "composite": true, "rootDir": "src", "outDir": "dist/types", "types": ["node"], "tsBuildInfoFile": "dist/host.tsbuildinfo" },
+  "include": ["src/**/*.ts"],
+  "references": [{"path":"../../packages/core"},{"path":"../../packages/jsonl-store"},{"path":"../../packages/browser-protocol"}]
+}

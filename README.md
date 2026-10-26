@@ -14,6 +14,10 @@ AI conversations move fast, but the reasoning behind a change often disappears i
 
 Open the same review history in Obsidian or VS Code. Writers, knowledge workers, developers, and file-aware AI tools can discuss a document, inspect the resulting change, and resolve the thread only after it has been verified.
 
+## Chrome (local preview)
+
+A Chrome reader with GitHub styling, Mermaid, a left TOC and a right Sideband comment panel is available for local development. It uses a Native Messaging host and works without VS Code running. See [macOS installation, usage and validation](docs/chrome.md). This preview is loaded in developer mode; it is not published to the Chrome Web Store.
+
 ## Why
 
 - **Context attached to the exact text** — keep each discussion beside the passage, paragraph, or code range it concerns.

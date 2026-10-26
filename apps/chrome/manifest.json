@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Sideband Comments — Markdown Reader",
+  "version": "0.1.0",
+  "description": "Read local Markdown with Mermaid and a shared Sideband comment panel.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6MER83Y0AZPXb6M+fp626WRGxLfYq8xY9a79WiylZp0p+v86FaajhXp+5u8KdfVzhKzUTKRb16WmjXtUszzF4ELLzU+60zYQgs2GYZL6oPxuXWwSFXdex5e5vlLvX0O3syiPSxZ7VF6ivUu267Aow8bbBrr/EpF+ey0W+8ziNmcA1qVW4mXXNIIvLe9hOa0C/sXMoq2H9IPW4INCqBqbDVBv1Cg15mIupLihNPxnBkWHPxrFiuOfjwjvyQ3VqMXPWPIcNOP350akpR660ZEYS9mEzbkMhSRLhrOjDQc2Oi91jz7uyCYVjh7MbsXDnmwfgTmWH2YalhEgMNU7Bx2wxwIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "storage"
+  ],
+  "host_permissions": [
+    "file:///*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Sideband Comments settings",
+    "default_icon": "icon.png"
+  },
+  "icons": { "16": "icon.png", "32": "icon.png", "48": "icon.png", "128": "icon.png" },
+  "web_accessible_resources": [{ "resources": ["icon.png"], "matches": ["file:///*"] }],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "file:///*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "github.css",
+        "syntax.css",
+        "viewer.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  }
+}

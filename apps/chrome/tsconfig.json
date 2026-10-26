@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "composite": true, "rootDir": "src", "outDir": "dist/types", "types": ["chrome"], "lib": ["ES2022", "DOM", "DOM.Iterable"], "esModuleInterop": true, "tsBuildInfoFile": "dist/chrome.tsbuildinfo" },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/browser-protocol" }]
+}
