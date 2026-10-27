@@ -64,7 +64,7 @@ try {
   await page.getByRole('button',{name:'Add comment',exact:true}).click();
   await page.locator('.sideband-comment-body').filter({hasText:'Browser comment'}).waitFor();
   await page.getByRole('textbox',{name:'Reply',exact:true}).fill('A browser reply');
-  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await page.getByRole('button',{name:'Reply',exact:true}).click();
   await page.locator('.sideband-comment-body').filter({hasText:'A browser reply'}).waitFor();
   assert.equal(await readFile(file,'utf8'),source);
   assert.equal(await page.locator('.sideband-thread section strong').first().innerText(),'Browser reviewer');
@@ -84,9 +84,9 @@ try {
   assert.equal(await page.locator('.sideband-thread').count(),1);
   await page.getByRole('button',{name:'Resolve',exact:true}).click();
   await page.locator('.sideband-thread-state').filter({hasText:'Resolved'}).waitFor();
-  await page.getByRole('button',{name:'Hide Resolved',exact:true}).click();
+  await options.getByRole('button',{name:'Hide Resolved',exact:true}).click();
   assert.equal(await page.locator('.sideband-thread').count(),0);
-  await page.getByRole('button',{name:'Show Resolved',exact:true}).click();
+  await options.getByRole('button',{name:'Show Resolved',exact:true}).click();
   assert.equal(await page.locator('.sideband-thread').count(),1);
   const blocked=await worker.evaluate(async()=>chrome.runtime.sendMessage({id:'forged',type:'settings.save',roots:['/'],author:'attacker'}));
   assert.equal(blocked.ok,false);assert.match(blocked.error,/settings/i);

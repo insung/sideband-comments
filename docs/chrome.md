@@ -50,9 +50,12 @@ The last file contains project paths, author name, and the allowed extension ID.
 
 1. Select text inside one paragraph, heading, list item or table cell. Its quote appears above **New comment** on the right and remains highlighted while you type. Supported inline emphasis and link labels are mapped to their exact source positions.
 2. Enter your comment and click **Add comment**.
-3. Enter a **Reply** under an open thread and click **Send reply**.
+3. Enter a **Reply** under an open thread and click **Reply**.
 4. Reload the tab to confirm persistence, or inspect the same document in your existing Sideband client.
-5. Click a thread's quoted text to scroll to and highlight its source passage. Click **Resolve** on an open thread to record its resolved state. Use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible.
+5. Click a thread's quoted text to scroll to and highlight its source passage. Click the link-styled **Resolve** at the top right of an open thread to record its resolved state. Open the extension's Settings tab and use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible. Chrome remembers the choice in this profile and updates open Markdown tabs without reloading or discarding drafts.
+6. Comments and replies matching your configured author name allow editing by double-clicking the comment body or focusing it and pressing Enter. The edit form provides **Save / Cancel**. **Delete** appears at the bottom right of each comment. Delete asks for confirmation and removes only that comment; the thread, other comments and append-only history remain. These actions also work on resolved threads without reopening them.
+
+Author names are local settings, not authenticated accounts. A comment written by another Sideband client with the same exact author name is treated as yours; different names are not merged. If the document, thread revision or author settings change before saving, the host rejects the old request. Your edit draft remains available to copy before reloading.
 
 Markdown files are unchanged. Events are appended to `.comments/documents/*.jsonl`; existing `.comments/threads/*.jsonl` files remain readable. Keep `.comments` synchronized with the same mechanism you already use for your project.
 
@@ -73,7 +76,7 @@ Resolved threads are readable but do not accept replies. Orphaned or ambiguous a
 - Supported extensions: `.md`, `.markdown`, `.mdown`, `.mkdn`, `.mkd`.
 - GitHub-style Markdown tables and strikethrough, Mermaid, and common code languages are supported. Unknown code languages remain readable without highlighting.
 - Raw HTML is displayed as text. Diagrams use Mermaid's strict security mode. Comment bodies are displayed as text.
-- There is no emoji conversion, MathJax, theme selector, remote-web-document support, comment edit/delete/reopen UI, browser store publication, or automatic updater.
+- There is no emoji conversion, MathJax, theme selector, remote-web-document support, comment reopen UI, browser store publication, or automatic updater.
 
 Markdown and comments are not uploaded by Sideband Comments. Markdown can contain external links or image URLs; normal browser requests for those resources still follow Chrome's network settings. The extension only renders `file:` Markdown tabs. The local host only reads Markdown inside registered projects and writes their comment stores. Project registration is accepted from the extension settings page, never from document content.
 

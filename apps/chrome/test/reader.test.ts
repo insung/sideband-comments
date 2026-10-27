@@ -90,7 +90,7 @@ describe('Chrome reader integration', () => {
     Object.defineProperty(dom.window,'CSS',{value:{highlights}});
     Object.defineProperty(dom.window,'Highlight',{value:class {constructor(public range:Range){}}});
     try {
-      await createReader(doc,{request:async message=>await dispatch(config,{id:crypto.randomUUID(),url:pathToFileURL(file).href,...message}) as DocumentSnapshot,loadWidths:async()=>({}),saveWidths:()=>{},diagrams:async()=>{},iconUrl:'icon.png'});
+      const reader=await createReader(doc,{request:async message=>await dispatch(config,{id:crypto.randomUUID(),url:pathToFileURL(file).href,...message}) as DocumentSnapshot,loadWidths:async()=>({}),saveWidths:()=>{},diagrams:async()=>{},iconUrl:'icon.png'});
       const range=doc.createRange();range.selectNodeContents(doc.querySelector('#sideband-document strong')!);
       dom.window.getSelection()!.addRange(range);doc.dispatchEvent(new dom.window.Event('selectionchange'));
       doc.querySelector<HTMLTextAreaElement>('[name="comment"]')!.value='Real store comment';
@@ -103,12 +103,22 @@ describe('Chrome reader integration', () => {
       expect(highlights.has('sideband-selection')).toBe(true);
       doc.querySelector<HTMLButtonElement>('[data-action="resolve"]')!.click();
       await vi.waitFor(()=>expect(doc.querySelector('.sideband-thread-state')!.textContent).toBe('Resolved'));
-      doc.querySelector<HTMLButtonElement>('[data-action="toggle-resolved"]')!.click();
+      reader.setHideResolved(true);
       expect(doc.querySelectorAll('.sideband-thread')).toHaveLength(0);
-      doc.querySelector<HTMLButtonElement>('[data-action="toggle-resolved"]')!.click();
+      reader.setHideResolved(false);
       expect(doc.querySelectorAll('.sideband-thread')).toHaveLength(1);
       const threads=await new JsonlThreadRepository(root).listByDocument('doc.md');
       expect(threads[0]?.status).toBe('resolved'); expect(threads[0]?.comments).toHaveLength(2);
+      doc.querySelector('.sideband-comment-body')!.dispatchEvent(new dom.window.MouseEvent('dblclick'));
+      doc.querySelector<HTMLTextAreaElement>('[name="edit"]')!.value='Edited through the reader';
+      doc.querySelector<HTMLButtonElement>('[data-action="save-edit"]')!.click();
+      await vi.waitFor(()=>expect(doc.querySelector('.sideband-comment-body')!.textContent).toBe('Edited through the reader'));
+      const replyEntry=doc.querySelectorAll<HTMLElement>('[data-comment-id]')[1]!;
+      replyEntry.querySelector<HTMLButtonElement>('[data-action="delete"]')!.click();
+      doc.querySelector<HTMLButtonElement>('[data-action="confirm-delete"]')!.click();
+      await vi.waitFor(()=>expect(doc.querySelectorAll('[data-comment-id]')).toHaveLength(1));
+      const final=await new JsonlThreadRepository(root).listByDocument('doc.md');
+      expect(final[0]?.status).toBe('resolved');expect(final[0]?.comments.map(c=>c.body)).toEqual(['Edited through the reader']);
       expect(await readFile(file,'utf8')).toBe(source);
     } finally { dom.window.close(); await rm(root,{recursive:true,force:true}); }
   });

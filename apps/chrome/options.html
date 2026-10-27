@@ -4,6 +4,10 @@
 <body>
 <main>
 <h1>Sideband Comments</h1>
+<h2>Comment display</h2>
+<button id="resolved" type="button" disabled>Loading comment display…</button>
+<p id="resolved-status" role="status" aria-live="polite">This setting applies to all Markdown tabs in this Chrome profile.</p>
+<h2>Local connection</h2>
 <p>Register local project folders and the name shown on your comments. Markdown files stay unchanged; comments are saved in each project's <code>.comments</code> folder.</p>
 <p>First install the Native Messaging host using the instructions in <code>docs/chrome.md</code>. In Chrome's extension details, enable <strong>Allow access to file URLs</strong>.</p>
 <form>
@@ -13,7 +17,7 @@
 <label for="author">Author name</label><input id="author" maxlength="100" required autocomplete="name">
 <button type="submit">Save settings</button>
 </form>
-<p role="status" aria-live="polite">Connecting to the local host…</p>
+<p id="connection-status" role="status" aria-live="polite">Connecting to the local host…</p>
 <p>Only registered folders are available to the local host. Files and comments are processed on your computer. This extension does not upload documents.</p>
 </main>
 <script src="options.js"></script>

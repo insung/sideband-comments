@@ -38,6 +38,11 @@ try {
   await context.exposeBinding('sidebandTestRelay',({page},request)=>relay(request,new URL(page.url()).pathname==='/options.html'?`chrome-extension://${id}/options.html`:pathToFileURL(file).href));
   await context.addInitScript(()=>{
     window.chrome=window.chrome || {};
+    const listeners=new Set();
+    const notify=changes=>{for(const fn of listeners)fn(changes,'local');};
+    window.addEventListener('storage',event=>{if(event.key)notify({[event.key]:{newValue:JSON.parse(event.newValue || 'null')}});});
+    window.chrome.storage={local:{get:async key=>({[key]:JSON.parse(localStorage.getItem(key) || 'null')}),set:async values=>{const changes={};for(const [key,value] of Object.entries(values)){localStorage.setItem(key,JSON.stringify(value));changes[key]={newValue:value};}notify(changes);}},onChanged:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)}};
+
     window.chrome.runtime={sendMessage:message=>window.sidebandTestRelay(message),getURL:name=>`https://sideband.test/${name}`};
   });
   await context.route('https://sideband.test/**',async route=>{
@@ -79,7 +84,7 @@ try {
   await page.getByRole('button',{name:'Add comment',exact:true}).click();
   await page.locator('.sideband-comment-body').filter({hasText:'Browser comment'}).waitFor();
   await page.getByRole('textbox',{name:'Reply',exact:true}).fill('A browser reply');
-  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await page.getByRole('button',{name:'Reply',exact:true}).click();
   await page.locator('.sideband-comment-body').filter({hasText:'A browser reply'}).waitFor();
   assert.equal(await readFile(file,'utf8'),source);
   assert.equal(await page.locator('.sideband-thread section strong').first().innerText(),'Browser reviewer');
@@ -101,9 +106,9 @@ try {
   assert.equal(await page.locator('.sideband-thread').count(),1);
   await page.getByRole('button',{name:'Resolve',exact:true}).click();
   await page.locator('.sideband-thread-state').filter({hasText:'Resolved'}).waitFor();
-  await page.getByRole('button',{name:'Hide Resolved',exact:true}).click();
+  await options.getByRole('button',{name:'Hide Resolved',exact:true}).click();
   assert.equal(await page.locator('.sideband-thread').count(),0);
-  await page.getByRole('button',{name:'Show Resolved',exact:true}).click();
+  await options.getByRole('button',{name:'Show Resolved',exact:true}).click();
   assert.equal(await page.locator('.sideband-thread').count(),1);
   console.log('PASS Resolve uses the shared store and filtering hides only resolved threads');
   const blocked=await relay({id:'forged',type:'settings.save',roots:['/'],author:'attacker'},pathToFileURL(file).href);

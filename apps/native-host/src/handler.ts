@@ -50,6 +50,15 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
     now: () => new Date().toISOString()
   });
   const threads = await repository.listByDocument(access.path);
+  const checkComment = (thread: ThreadState, author: string) => {
+    if (request.type !== 'comment.edit' && request.type !== 'comment.delete') return;
+    if (thread.deleted || thread.documentPath !== access.path) throw new Error('Thread does not belong to this document.');
+    const comment = thread.comments.find(comment => comment.id === request.commentId);
+    if (!comment) throw new Error('Comment was deleted or does not exist. Reload this Markdown tab.');
+    if (author !== config.author) throw new Error('Author settings changed. Reload this Markdown tab.');
+    if (comment.author.name !== author) throw new Error('Only your own comments can be changed.');
+    if (thread.revision !== request.expectedRevision) throw new Error('Thread changed in another client. Copy your draft and reload this Markdown tab.');
+  };
   let updated: ThreadState | undefined;
   if (request.type !== 'document.read') {
     if (!config.author.trim()) throw new Error('Set your author name in extension settings.');
@@ -61,13 +70,18 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
     } else {
       const thread = await service.get(request.threadId);
       if (thread.documentPath !== access.path || thread.deleted) throw new Error('Thread does not belong to this document.');
+      if (request.type === 'comment.edit' || request.type === 'comment.delete') {
+        checkComment(thread, config.author);
+        updated = request.type === 'comment.edit' ? await service.editComment(thread.id, request.commentId, request.body) : await service.deleteComment(thread.id, request.commentId);
+      } else {
       if (thread.status === 'resolved') throw new Error(request.type === 'thread.resolve' ? 'This thread is already resolved.' : 'This thread is resolved. Reopen it in an editor before replying.');
       if (request.type === 'thread.reply' && resolveAnchor(source, thread.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
       updated = request.type === 'thread.resolve' ? await service.resolve(thread.id) : await service.reply(thread.id, request.body);
+      }
     }
   }
   const snapshot: DocumentSnapshot = {
-    source, version, path: access.path, projectRoot: access.root,
+    source, version, author: config.author, path: access.path, projectRoot: access.root,
     threads: [...threads.filter(thread => thread.id !== updated?.id), ...(updated ? [updated] : [])].map(thread => ({ thread, resolution: resolveAnchor(source, thread.anchor) }))
   };
   encodeMessage({ id: request.id, ok: true, value: snapshot });
@@ -83,6 +97,7 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
       await assertStoreSafe(access.root);
       const liveSource = await readFile(liveAccess.file, 'utf8');
       if (createHash('sha256').update(liveSource).digest('hex') !== version) throw new Error('Document changed. Reload this Markdown tab before commenting.');
+      if (request.type === 'comment.edit' || request.type === 'comment.delete') checkComment(foldThread(currentEvents), liveConfig.author);
       if (request.type === 'thread.reply' || request.type === 'thread.resolve') {
         const current = foldThread(currentEvents);
         if (current.deleted || current.documentPath !== access.path) throw new Error('Thread does not belong to this document.');
