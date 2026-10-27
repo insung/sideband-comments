@@ -84,7 +84,8 @@ export function createCommentPanel(document: Document, actions: Actions) {
       reveal.addEventListener('click', () => { if (!reveal.disabled) actions.reveal(thread.id); }); quote.append(reveal);
       const state = document.createElement('p'); state.className = 'sideband-thread-state';
       state.textContent = thread.status === 'resolved' ? 'Resolved' : resolution.kind === 'resolved' ? 'Open' : `Anchor ${resolution.kind}`;
-      article.append(quote, state);
+      const threadHeading=document.createElement('div'); threadHeading.className='sideband-thread-heading'; threadHeading.append(quote);
+      article.append(threadHeading, state);
       for (const comment of thread.comments) {
         const entry = document.createElement('section'); entry.dataset.commentId = comment.id;
         const author = document.createElement('strong'); author.textContent = comment.author.name;
@@ -92,27 +93,35 @@ export function createCommentPanel(document: Document, actions: Actions) {
         const text = document.createElement('p'); text.className = 'sideband-comment-body'; text.textContent = comment.body;
         entry.append(author, time, text); article.append(entry);
         if (current?.author && comment.author.name === current.author) {
+          const controls=document.createElement('div'); controls.className='sideband-comment-actions'; entry.append(controls);
           const action = (name: string, title: string, run: () => void) => {
             const button = document.createElement('button'); button.type = 'button'; button.dataset.action = name; button.textContent = title;
-            button.addEventListener('click', () => { if (!button.disabled) run(); }); entry.append(button);
+            button.addEventListener('click', () => { if (!button.disabled) run(); }); controls.append(button);
           };
+          const beginEdit=()=>{
+            if (!ready || busy || edits.has(comment.id)) return;
+            edits.set(comment.id,{body:comment.body,revision:thread.revision}); deletions.delete(comment.id); render();
+            const item=[...list.querySelectorAll<HTMLElement>('[data-comment-id]')].find(item=>item.dataset.commentId===comment.id);
+            item?.querySelector<HTMLTextAreaElement>('[name="edit"]')?.focus();
+          };
+          text.tabIndex=0; text.title='Double-click to edit'; text.setAttribute('aria-label','Comment body. Double-click or press Enter to edit.');
+          text.addEventListener('dblclick',beginEdit);
+          text.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();beginEdit();}});
           const edit = edits.get(comment.id);
           if (edit) {
             const label = document.createElement('label'); label.textContent = 'Edit comment';
             const input = document.createElement('textarea'); input.name = 'edit'; input.rows = 3; input.maxLength = 16000; input.value = edit.body;
-            input.addEventListener('input', () => { edit.body = input.value; }); label.append(input); entry.append(label);
+            input.addEventListener('input', () => { edit.body = input.value; }); label.append(input); entry.insertBefore(label,controls);
             action('save-edit','Save',() => {
               edit.body = input.value;
               if (!edit.body.trim()) { failure(new Error('Comment body cannot be blank.')); return; }
               void perform(async()=>{ await actions.edit(thread.id,comment.id,edit.body.trim(),edit.revision); edits.delete(comment.id); render(); });
             });
             action('cancel-edit','Cancel',()=>{ edits.delete(comment.id); render(); });
-          } else {
-            action('edit','Edit',()=>{ edits.set(comment.id,{body:comment.body,revision:thread.revision}); deletions.delete(comment.id); render(); });
           }
           const deletion = deletions.get(comment.id);
           if (deletion !== undefined) {
-            const warning = document.createElement('p'); warning.textContent = 'Delete this comment? Its saved history and other comments will remain.'; entry.append(warning);
+            const warning = document.createElement('p'); warning.textContent = 'Delete this comment? Its saved history and other comments will remain.'; entry.insertBefore(warning,controls);
             action('confirm-delete','Delete comment',()=>{ void perform(async()=>{ await actions.delete(thread.id,comment.id,deletion); deletions.delete(comment.id); edits.delete(comment.id); render(); }); });
             action('cancel-delete','Cancel',()=>{ deletions.delete(comment.id); render(); });
           } else if (!edit) action('delete','Delete',()=>{ deletions.set(comment.id,thread.revision); render(); });
@@ -124,7 +133,7 @@ export function createCommentPanel(document: Document, actions: Actions) {
       const reply = document.createElement('textarea'); reply.name = 'reply'; reply.rows = 2; reply.maxLength = 16000; reply.required = true;
       reply.value = drafts.get(thread.id) ?? ''; reply.dataset.blocked = String(blocked); replyLabel.append(reply);
       reply.addEventListener('input', () => drafts.set(thread.id, reply.value));
-      const button = document.createElement('button'); button.type = 'submit'; button.textContent = 'Send reply'; button.dataset.action = 'reply'; button.dataset.blocked = String(blocked);
+      const button = document.createElement('button'); button.type = 'submit'; button.textContent = 'Reply'; button.dataset.action = 'reply'; button.dataset.blocked = String(blocked);
       replyForm.append(replyLabel, button);
       if (blocked) {
         const reason = document.createElement('p'); reason.className = 'sideband-reply-help'; reason.id = `sideband-reply-help-${thread.id}`;
@@ -145,7 +154,7 @@ export function createCommentPanel(document: Document, actions: Actions) {
       article.append(replyForm);
       if (thread.status === 'open') {
         const resolve = document.createElement('button'); resolve.type = 'button'; resolve.textContent = 'Resolve'; resolve.dataset.action = 'resolve';
-        resolve.addEventListener('click', () => { if (!resolve.disabled) void perform(() => actions.resolve(thread.id)); }); article.append(resolve);
+        resolve.addEventListener('click', () => { if (!resolve.disabled) void perform(() => actions.resolve(thread.id)); }); threadHeading.append(resolve);
       }
       list.append(article);
       if (focusedReply && thread.id === focusedThread) {

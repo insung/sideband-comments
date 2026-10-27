@@ -109,7 +109,7 @@ describe('Chrome reader integration', () => {
       expect(doc.querySelectorAll('.sideband-thread')).toHaveLength(1);
       const threads=await new JsonlThreadRepository(root).listByDocument('doc.md');
       expect(threads[0]?.status).toBe('resolved'); expect(threads[0]?.comments).toHaveLength(2);
-      doc.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();
+      doc.querySelector('.sideband-comment-body')!.dispatchEvent(new dom.window.MouseEvent('dblclick'));
       doc.querySelector<HTMLTextAreaElement>('[name="edit"]')!.value='Edited through the reader';
       doc.querySelector<HTMLButtonElement>('[data-action="save-edit"]')!.click();
       await vi.waitFor(()=>expect(doc.querySelector('.sideband-comment-body')!.textContent).toBe('Edited through the reader'));

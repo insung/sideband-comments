@@ -64,7 +64,7 @@ try {
   await page.getByRole('button',{name:'Add comment',exact:true}).click();
   await page.locator('.sideband-comment-body').filter({hasText:'Browser comment'}).waitFor();
   await page.getByRole('textbox',{name:'Reply',exact:true}).fill('A browser reply');
-  await page.getByRole('button',{name:'Send reply',exact:true}).click();
+  await page.getByRole('button',{name:'Reply',exact:true}).click();
   await page.locator('.sideband-comment-body').filter({hasText:'A browser reply'}).waitFor();
   assert.equal(await readFile(file,'utf8'),source);
   assert.equal(await page.locator('.sideband-thread section strong').first().innerText(),'Browser reviewer');

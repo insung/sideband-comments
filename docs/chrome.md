@@ -50,10 +50,10 @@ The last file contains project paths, author name, and the allowed extension ID.
 
 1. Select text inside one paragraph, heading, list item or table cell. Its quote appears above **New comment** on the right and remains highlighted while you type. Supported inline emphasis and link labels are mapped to their exact source positions.
 2. Enter your comment and click **Add comment**.
-3. Enter a **Reply** under an open thread and click **Send reply**.
+3. Enter a **Reply** under an open thread and click **Reply**.
 4. Reload the tab to confirm persistence, or inspect the same document in your existing Sideband client.
-5. Click a thread's quoted text to scroll to and highlight its source passage. Click **Resolve** on an open thread to record its resolved state. Open the extension's Settings tab and use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible. Chrome remembers the choice in this profile and updates open Markdown tabs without reloading or discarding drafts.
-6. Comments and replies matching your configured author name show **Edit** and **Delete**. Edit opens a form with **Save / Cancel**. Delete asks for confirmation and removes only that comment; the thread, other comments and append-only history remain. These actions also work on resolved threads without reopening them.
+5. Click a thread's quoted text to scroll to and highlight its source passage. Click the link-styled **Resolve** at the top right of an open thread to record its resolved state. Open the extension's Settings tab and use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible. Chrome remembers the choice in this profile and updates open Markdown tabs without reloading or discarding drafts.
+6. Comments and replies matching your configured author name allow editing by double-clicking the comment body or focusing it and pressing Enter. The edit form provides **Save / Cancel**. **Delete** appears at the bottom right of each comment. Delete asks for confirmation and removes only that comment; the thread, other comments and append-only history remain. These actions also work on resolved threads without reopening them.
 
 Author names are local settings, not authenticated accounts. A comment written by another Sideband client with the same exact author name is treated as yours; different names are not merged. If the document, thread revision or author settings change before saving, the host rejects the old request. Your edit draft remains available to copy before reloading.
 
