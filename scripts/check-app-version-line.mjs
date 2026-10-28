@@ -29,7 +29,9 @@ export function assertAppVersionPolicy({
   rootObsidianManifest,
   obsidianVersions,
   claudePlugin,
-  codexPlugin
+  codexPlugin,
+  chromePackage,
+  chromeManifest
 }) {
   const vscode = parseVersion("VS Code", vscodePackage.version);
   const obsidian = parseVersion("Obsidian", obsidianPackage.version);
@@ -57,10 +59,13 @@ export function assertAppVersionPolicy({
   if (codexPlugin.version !== vscode) {
     throw new Error(`Codex plugin must share the app version: ${codexPlugin.version} != ${vscode}`);
   }
+  const chrome = parseVersion("Chrome", chromePackage.version);
+  if (chrome !== vscode) throw new Error(`Chrome must share the same version as the editor apps: ${chrome} != ${vscode}`);
+  if (chromeManifest.version !== chrome) throw new Error("Chrome package and manifest versions must match exactly");
 
   requireArtifactVersion("sideband-comments-vscode", vscodePackage, "vsix");
   requireArtifactVersion("sideband-comments-obsidian", obsidianPackage, "zip");
-  return { vscode, obsidian, plugin: vscode };
+  return { vscode, obsidian, chrome, plugin: vscode };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
@@ -71,7 +76,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     rootObsidianManifest: readJson("manifest.json"),
     obsidianVersions: readJson("versions.json"),
     claudePlugin: readJson("plugin/.claude-plugin/plugin.json"),
-    codexPlugin: readJson("plugin/.codex-plugin/plugin.json")
+    codexPlugin: readJson("plugin/.codex-plugin/plugin.json"),
+    chromePackage: readJson("apps/chrome/package.json"),
+    chromeManifest: readJson("apps/chrome/manifest.json")
   });
-  console.log(`App version policy passed: VS Code ${result.vscode}, Obsidian ${result.obsidian}, plugin ${result.plugin}`);
+  console.log(`App version policy passed: Chrome ${result.chrome}, VS Code ${result.vscode}, Obsidian ${result.obsidian}, plugin ${result.plugin}`);
 }

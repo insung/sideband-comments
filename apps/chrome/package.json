@@ -1,11 +1,14 @@
 {
   "name": "sideband-comments-chrome",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
+    "prepackage": "node ../../scripts/check-app-version-line.mjs",
     "package": "npm run build && node package.mjs",
+    "prepackage:webstore": "node ../../scripts/check-app-version-line.mjs",
+    "package:webstore": "npm run build && node package.mjs --webstore",
     "test:browser": "node test/browser.mjs",
     "test:ui": "node test/ui.mjs"
   },

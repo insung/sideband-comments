@@ -46,6 +46,28 @@ The registration files are:
 
 The last file contains project paths, author name, and the allowed extension ID. It contains no online service credentials.
 
+## Chrome Web Store installation preparation
+
+The initial Chrome Web Store submission is awaiting review, as reported by the publisher on 2026-10-28. It predates the Reopen change in PR #13; the final 2.0.0 source and packages include that change. The submitted ZIP and final release ZIP are different artifacts. Do not use the Reopen workflow below as a claim about the pending submission. There is no public store URL to use at this stage.
+
+The store extension and Native Messaging host are separate installations. A store download does not install Node.js, clone or build this repository, or register the host. The initial host installation uses the source checkout and build steps above; there is no standalone host installer package yet.
+
+Once an approved store version is available:
+
+1. Install that version from its actual listing and enable **Allow access to file URLs** in its extension Details.
+2. Copy the installed extension's actual ID from `chrome://extensions`. Do not use the development ID or assume the store ID matches it.
+3. Build the host from the source revision corresponding to that release and keep the checkout in a stable location. Register it with the actual store ID:
+
+```sh
+node apps/native-host/scripts/install.mjs --extension-id YOUR_ACTUAL_STORE_EXTENSION_ID
+```
+
+4. Open Settings to check the registered folders and author. Open a disposable Markdown file from a registered project, create a comment, reply, reload, and verify both persisted before using your normal documents.
+
+Re-registering without `--project` or `--author` preserves saved project roots and author settings. It replaces the allowed extension ID: this installer authorizes one extension ID at a time, not development and store extensions simultaneously. Changing the registered ID can disconnect the previous extension; plan the switch deliberately. No change to your existing registration is needed merely to prepare or upload a ZIP.
+
+If the development and store IDs should match for future work, obtain the public key of the uploaded store item and evaluate a deliberate development-key migration. Do not replace the checked-in development key as part of ZIP packaging or overwrite an active host registration to test an upload.
+
 ## Comment on a document
 
 1. Select text inside one paragraph, heading, list item or table cell. Its quote appears above **New comment** on the right and remains highlighted while you type. Supported inline emphasis and link labels are mapped to their exact source positions.
@@ -112,6 +134,16 @@ npm run package --workspace apps/chrome
 ```
 
 The archive is `apps/chrome/dist/sideband-comments-chrome.zip`. Extract it before using **Load unpacked**. The native host is installed separately using the instructions above.
+
+For a **store upload**, use the separate packaging command:
+
+```sh
+npm run package:webstore --workspace apps/chrome
+```
+
+This produces `apps/chrome/dist/sideband-comments-chrome-webstore.zip`. It excludes the development manifest `key` and `extension-id.txt`, without changing the unpacked `dist/manifest.json`, development ZIP or existing Chrome installation. Upload this ZIP without extracting it. Packaging neither submits for review nor publishes anything.
+
+See [store listing copy and image guidance](chrome-web-store.md) and [privacy and local data](privacy.md). Before a review submission, record the actual store ID and exact source revision used for the host, and verify a complete installation with that candidate.
 
 Browser checks use a separately installed Chromium executable; `playwright-core` does not download a browser:
 

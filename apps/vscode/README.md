@@ -6,18 +6,22 @@
 
 <p align="center"><strong>Work with AI where the document lives.</strong></p>
 
-![Sideband Comments keeps one comment history across Obsidian and VS Code](https://raw.githubusercontent.com/insung/sideband-comments/main/media/release/sideband-comments-1.0.0-hero.png)
+![Code in VS Code, Markdown in Obsidian and Chrome, and optional Claude Code working with review threads](https://raw.githubusercontent.com/insung/sideband-comments/main/docs/assets/readme/sideband-comments-2.0.0-hero-v4.png)
+
+*Illustrated workflow with sample code and simplified app layouts. Claude Code is an optional, separately installed integration.*
 
 AI conversations move fast, but the reasoning behind a change often disappears into chat history. Sideband Comments anchors questions, replies, and decisions to the exact text under review while keeping the document itself clean.
 
-Open the same review history in Obsidian or VS Code. Writers, knowledge workers, developers, and file-aware AI tools can discuss a document, inspect the resulting change, and resolve the thread only after it has been verified.
+Review source code in VS Code and Markdown in Chrome, VS Code or Obsidian. Related files share the project’s local review history. Ask your separately installed AI tool to read the comments, surrounding code and related documentation, make the requested changes, and reply. People inspect the result and decide when to resolve a thread.
+
+Sideband Comments grew out of repeatedly quoting document passages into Claude, asking for one change after another, and losing sight of the original goal. Keep the goal in your project notes and the requests beside the code or prose you are reviewing. [Read the five-scene story](https://github.com/insung/sideband-comments/blob/main/docs/review-story.md).
 
 ## Why Sideband Comments
 
 - **Context attached to the exact text** — keep each discussion beside the passage, paragraph, or code range it concerns.
-- **One review history across two editors** — continue the same conversation in Obsidian and VS Code.
+- **One review history across your tools** — continue the same local conversation in Chrome, VS Code and Obsidian.
 - **Original text preserved for verification** — compare what was reviewed with what the document says now.
-- **Local-first, append-only storage** — retain the full discussion history in `.comments/threads/*.jsonl` without embedding review data in the document.
+- **Local-first, append-only storage** — retain the full discussion history in `.comments/documents/*.jsonl` (with legacy `threads/` still readable) without embedding review data in the document.
 
 ## Built for code and writing
 
