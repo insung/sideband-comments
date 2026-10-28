@@ -4,6 +4,7 @@ interface Actions {
   create(body: string): Promise<void>;
   reply(id: string, body: string): Promise<void>;
   resolve(id: string): Promise<void>;
+  reopen(id: string): Promise<void>;
   reveal(id: string): void;
   edit(threadId: string, commentId: string, body: string, expectedRevision: number): Promise<void>;
   delete(threadId: string, commentId: string, expectedRevision: number): Promise<void>;
@@ -152,9 +153,10 @@ export function createCommentPanel(document: Document, actions: Actions) {
         });
       });
       article.append(replyForm);
-      if (thread.status === 'open') {
-        const resolve = document.createElement('button'); resolve.type = 'button'; resolve.textContent = 'Resolve'; resolve.dataset.action = 'resolve';
-        resolve.addEventListener('click', () => { if (!resolve.disabled) void perform(() => actions.resolve(thread.id)); }); threadHeading.append(resolve);
+      {
+        const resolved = thread.status === 'resolved';
+        const resolve = document.createElement('button'); resolve.type = 'button'; resolve.textContent = resolved ? 'Reopen' : 'Resolve'; resolve.dataset.action = resolved ? 'reopen' : 'resolve';
+        resolve.addEventListener('click', () => { if (!resolve.disabled) void perform(() => resolved ? actions.reopen(thread.id) : actions.resolve(thread.id)); }); threadHeading.append(resolve);
       }
       list.append(article);
       if (focusedReply && thread.id === focusedThread) {

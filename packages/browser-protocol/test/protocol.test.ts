@@ -29,3 +29,9 @@ describe('browser protocol', () => {
     expect(() => parseRequest(value)).toThrow();
   });
 });
+
+it('accepts reopen without a body and rejects invalid reopen targets',()=>{
+ const request={id:'reopen',type:'thread.reopen',url:'file:///tmp/doc.md',version:'a'.repeat(64),threadId:'thread-1'};
+ expect(parseRequest(request).type).toBe('thread.reopen');
+ for(const patch of [{threadId:'../outside'},{version:'bad'},{url:'https://example.com/a.md'},{threadId:undefined}]) expect(()=>parseRequest({...request,...patch})).toThrow();
+});

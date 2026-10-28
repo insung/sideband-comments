@@ -52,7 +52,7 @@ The last file contains project paths, author name, and the allowed extension ID.
 2. Enter your comment and click **Add comment**.
 3. Enter a **Reply** under an open thread and click **Reply**.
 4. Reload the tab to confirm persistence, or inspect the same document in your existing Sideband client.
-5. Click a thread's quoted text to scroll to and highlight its source passage. Click the link-styled **Resolve** at the top right of an open thread to record its resolved state. Open the extension's Settings tab and use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible. Chrome remembers the choice in this profile and updates open Markdown tabs without reloading or discarding drafts.
+5. Click a thread's quoted text to scroll to and highlight its source passage. Click the link-styled **Resolve** at the top right of an open thread to record its resolved state. Open the extension's Settings tab and use **Hide Resolved / Show Resolved** to filter resolved threads; open threads remain visible. To reopen a resolved thread, show resolved threads in Settings and click **Reopen** at the top right of the thread. Chrome remembers the choice in this profile and updates open Markdown tabs without reloading or discarding drafts.
 6. Comments and replies matching your configured author name allow editing by double-clicking the comment body or focusing it and pressing Enter. The edit form provides **Save / Cancel**. **Delete** appears at the bottom right of each comment. Delete asks for confirmation and removes only that comment; the thread, other comments and append-only history remain. These actions also work on resolved threads without reopening them.
 
 Author names are local settings, not authenticated accounts. A comment written by another Sideband client with the same exact author name is treated as yours; different names are not merged. If the document, thread revision or author settings change before saving, the host rejects the old request. Your edit draft remains available to copy before reloading.
@@ -61,12 +61,12 @@ Markdown files are unchanged. Events are appended to `.comments/documents/*.json
 
 Selection endpoints must map to exact source text. Bold/italic text and explicit link labels are supported, including repeated phrases using parser source positions. A selection across formatting may quote Markdown syntax between its endpoints. Transformed text such as entities, normalized inline code or autolinks may be refused when their source positions cannot be proven. Multiple blocks, code blocks and diagrams are not selectable. The panel explains unsupported selections; it never guesses an anchor or silently widens a selection to an entire paragraph.
 
-Resolved threads are readable but do not accept replies. Orphaned or ambiguous anchors also do not accept replies; the panel shows the reason beside the disabled reply form. Open threads can be resolved even when their quote moved. Re-anchor or reopen them in an existing editor client.
+Resolved threads are readable but do not accept replies. Orphaned or ambiguous anchors also do not accept replies; the panel shows the reason beside the disabled reply form. Open threads can be resolved even when their quote moved. Use **Reopen** in Chrome to resume a resolved thread. Re-anchor moved quotes in an existing editor client; reopening does not repair an orphaned or ambiguous anchor.
 
 ## Refresh and limits
 
 - Use Chrome's tab reload (Command-R on macOS) to read document and comment changes. There are no in-page Refresh or Toggle contents buttons, autoreload or background polling. Copy any unsaved drafts before reloading.
-- If a document changes while you are reading it, a comment/reply/resolve using the old version is refused. Reload the Markdown tab, then select again.
+- If a document changes while you are reading it, a comment/reply/resolve/reopen using the old version is refused. Reload the Markdown tab, then select again.
 - The center column is at most 1200px wide. ToC lists H1 and H2 only; deeper headings remain in the article. On desktop the ToC, article and comments scroll independently. On narrower screens the ToC appears above the article; small screens stack the comments below it.
 - Drag the divider beside either side panel to adjust its width, or focus the divider and use Left/Right (Home/End for its limits). Chrome remembers these widths locally across documents and tabs. Widths are constrained to keep the article readable; narrow screens keep the stacked layout.
 - A closed YAML frontmatter block at the start of a file is hidden from the article and table of contents. The original Markdown and comment anchor offsets stay unchanged.
