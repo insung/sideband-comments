@@ -49,6 +49,10 @@ export async function createReader(document: Document, options: ReaderOptions) {
       if (!snapshot) throw new Error('Reload this Markdown tab before resolving.');
       accept(await options.request({type:'thread.resolve',version:snapshot.version,threadId}));
     },
+    reopen:async threadId => {
+      if (!snapshot) throw new Error('Reload this Markdown tab before reopening.');
+      accept(await options.request({type:'thread.reopen',version:snapshot.version,threadId}));
+    },
     edit:async (threadId,commentId,body,expectedRevision) => {
       if (!snapshot) throw new Error('Reload this Markdown tab before editing.');
       accept(await options.request({type:'comment.edit',version:snapshot.version,threadId,commentId,body,expectedRevision}));

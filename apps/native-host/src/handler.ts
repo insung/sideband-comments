@@ -59,6 +59,13 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
     if (comment.author.name !== author) throw new Error('Only your own comments can be changed.');
     if (thread.revision !== request.expectedRevision) throw new Error('Thread changed in another client. Copy your draft and reload this Markdown tab.');
   };
+  const checkStatus = (thread: ThreadState) => {
+    if (request.type === 'thread.reopen') {
+      if (thread.status !== 'resolved') throw new Error('This thread is already open. Reload this Markdown tab.');
+    } else if (thread.status === 'resolved') {
+      throw new Error(request.type === 'thread.resolve' ? 'This thread is already resolved.' : 'This thread is resolved. Reopen it before replying.');
+    }
+  };
   let updated: ThreadState | undefined;
   if (request.type !== 'document.read') {
     if (!config.author.trim()) throw new Error('Set your author name in extension settings.');
@@ -74,9 +81,9 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
         checkComment(thread, config.author);
         updated = request.type === 'comment.edit' ? await service.editComment(thread.id, request.commentId, request.body) : await service.deleteComment(thread.id, request.commentId);
       } else {
-      if (thread.status === 'resolved') throw new Error(request.type === 'thread.resolve' ? 'This thread is already resolved.' : 'This thread is resolved. Reopen it in an editor before replying.');
-      if (request.type === 'thread.reply' && resolveAnchor(source, thread.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
-      updated = request.type === 'thread.resolve' ? await service.resolve(thread.id) : await service.reply(thread.id, request.body);
+        checkStatus(thread);
+        if (request.type === 'thread.reply' && resolveAnchor(source, thread.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
+        updated = request.type === 'thread.resolve' ? await service.resolve(thread.id) : request.type === 'thread.reopen' ? await service.reopen(thread.id) : await service.reply(thread.id, request.body);
       }
     }
   }
@@ -98,13 +105,13 @@ export async function dispatch(configPath: string, raw: unknown): Promise<Result
       const liveSource = await readFile(liveAccess.file, 'utf8');
       if (createHash('sha256').update(liveSource).digest('hex') !== version) throw new Error('Document changed. Reload this Markdown tab before commenting.');
       if (request.type === 'comment.edit' || request.type === 'comment.delete') checkComment(foldThread(currentEvents), liveConfig.author);
-      if (request.type === 'thread.reply' || request.type === 'thread.resolve') {
+      if (request.type === 'thread.reply' || request.type === 'thread.resolve' || request.type === 'thread.reopen') {
         const current = foldThread(currentEvents);
         if (current.deleted || current.documentPath !== access.path) throw new Error('Thread does not belong to this document.');
-        if (current.status === 'resolved') throw new Error(request.type === 'thread.resolve' ? 'This thread is already resolved.' : 'This thread is resolved. Reopen it in an editor before replying.');
+        checkStatus(current);
         if (request.type === 'thread.reply' && resolveAnchor(liveSource, current.anchor).kind !== 'resolved') throw new Error('Thread anchor is orphaned or ambiguous. Re-anchor it in an editor before replying.');
-        if (request.type === 'thread.resolve') {
-          // Preserve replies committed while this resolve waited for the shared lock.
+        if (request.type === 'thread.resolve' || request.type === 'thread.reopen') {
+          // Preserve comment changes committed while this status change waited for the shared lock.
           event.revision = current.revision + 1;
           const resolved = foldThread([...currentEvents, event]);
           snapshot.threads = snapshot.threads.map(entry => entry.thread.id === resolved.id

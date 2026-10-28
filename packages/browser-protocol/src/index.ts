@@ -18,6 +18,7 @@ export type Request = { id: string } & (
   | { type: 'thread.create'; url: string; version: string; start: number; end: number; body: string }
   | { type: 'thread.reply'; url: string; version: string; threadId: string; body: string }
   | { type: 'thread.resolve'; url: string; version: string; threadId: string }
+  | { type: 'thread.reopen'; url: string; version: string; threadId: string }
   | { type: 'comment.edit'; url: string; version: string; threadId: string; commentId: string; expectedRevision: number; body: string }
   | { type: 'comment.delete'; url: string; version: string; threadId: string; commentId: string; expectedRevision: number }
 );
@@ -40,7 +41,7 @@ export function parseRequest(value: unknown): Request {
   if (url.protocol !== 'file:' || (url.hostname && url.hostname !== 'localhost') || url.search || url.hash) return fail();
   if (value.type === 'document.read') return value as Request;
   if (typeof value.version !== 'string' || !/^[a-f0-9]{64}$/.test(value.version)) return fail();
-  if (value.type !== 'thread.resolve' && value.type !== 'comment.delete' && !string(value.body, 16_000)) return fail();
+  if (value.type !== 'thread.resolve' && value.type !== 'thread.reopen' && value.type !== 'comment.delete' && !string(value.body, 16_000)) return fail();
   if (value.type === 'comment.edit' || value.type === 'comment.delete') {
     const identifier = (id: unknown) => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(id) && !id.includes('..');
     if (!identifier(value.threadId) || !identifier(value.commentId) || !Number.isSafeInteger(value.expectedRevision) || (value.expectedRevision as number) < 0) return fail();
@@ -50,6 +51,6 @@ export function parseRequest(value: unknown): Request {
     if (!Number.isSafeInteger(value.start) || !Number.isSafeInteger(value.end) || (value.start as number) < 0 || (value.end as number) <= (value.start as number)) return fail();
     return value as Request;
   }
-  if ((value.type === 'thread.reply' || value.type === 'thread.resolve') && typeof value.threadId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.threadId) && !value.threadId.includes('..')) return value as Request;
+  if ((value.type === 'thread.reply' || value.type === 'thread.resolve' || value.type === 'thread.reopen') && typeof value.threadId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.threadId) && !value.threadId.includes('..')) return value as Request;
   return fail();
 }

@@ -220,3 +220,52 @@ it.each([false, true])('accounts for a concurrent reply before resolving (oversi
   }
   expect(await readFile(file, 'utf8')).toBe(source);
 });
+
+const reopenRequest = (snapshot: any, threadId = snapshot.threads[0].thread.id) => ({...resolveRequest(snapshot, threadId), type:'thread.reopen'});
+it('reopens with the shared event, preserving history and enabling replies',async()=>{
+ const created=await create();const done:any=await call(resolveRequest(created));const id=done.threads[0].thread.id;
+ const before=await new JsonlThreadRepository(root).readEvents(id);
+ const opened:any=await call(reopenRequest(done));
+ expect(opened.threads[0].thread.status).toBe('open');expect(opened.threads[0].thread.anchor).toEqual(done.threads[0].thread.anchor);
+ expect(opened.threads[0].thread.comments).toEqual(done.threads[0].thread.comments);
+ const events=await new JsonlThreadRepository(root).readEvents(id);expect(events.slice(0,-1)).toEqual(before);expect(events.at(-1)?.type).toBe('thread.reopened');
+ const replied:any=await call({...reopenRequest(opened),type:'thread.reply',body:'After reopening'});
+ expect(replied.threads[0].thread.comments.map((c:any)=>c.body)).toEqual(['Please clarify','After reopening']);
+ await expect(call(reopenRequest(opened))).rejects.toThrow(/already open/i);expect(await readFile(file,'utf8')).toBe(source);
+});
+it('reopens an orphan without permitting an unsafe reply',async()=>{
+ const done:any=await call(resolveRequest(await create()));await writeFile(file,source.replace('precise phrase','removed quote'));
+ const opened:any=await call(reopenRequest(await read()));expect(opened.threads[0].thread.status).toBe('open');expect(opened.threads[0].thread.anchor).toEqual(done.threads[0].thread.anchor);
+ await expect(call({...reopenRequest(opened),type:'thread.reply',body:'Unsafe reply'})).rejects.toThrow(/anchor/i);
+});
+it('rejects stale reopen and threads from another document or deleted threads',async()=>{
+ const done:any=await call(resolveRequest(await create()));const id=done.threads[0].thread.id;
+ await writeFile(file,source+'Changed');await expect(call(reopenRequest(done))).rejects.toThrow(/Reload/i);
+ const second=join(root,'second.md');await writeFile(second,source);const other:any=await call({type:'document.read',url:pathToFileURL(second).href});
+ await expect(call({...reopenRequest(other,id),url:pathToFileURL(second).href})).rejects.toThrow(/document/i);
+ const service=new CommentService(new JsonlThreadRepository(root),{actor:()=>({id:'x',name:'Other'}),id:randomUUID,now:()=>new Date().toISOString()});await service.delete(id);
+ await expect(call(reopenRequest(await read(),id))).rejects.toThrow(/document/i);
+ expect((await new JsonlThreadRepository(root).readEvents(id)).map(e=>e.type)).toEqual(['thread.created','thread.resolved','thread.deleted']);
+});
+it.each(['source','opened','deleted','relocated','access'])('rechecks %s while reopen waits for the lock',async change=>{
+ const done:any=await call(resolveRequest(await create()));const thread=done.threads[0].thread;
+ const lock=join(root,'.comments','store.lock');await writeFile(lock,'other');let signal!:()=>void;const entered=new Promise<void>(r=>{signal=r;});
+ const original=JsonlThreadRepository.prototype.append;vi.spyOn(JsonlThreadRepository.prototype,'append').mockImplementation(function(...args){signal();return original.apply(this,args);});
+ const result=call(reopenRequest(done));const rejected=expect(result).rejects.toThrow(change==='source'?/Reload/i:change==='access'?/registered|outside/i:change==='opened'?/already open/i:/document/i);await entered;
+ if(change==='source')await writeFile(file,source+'Changed');
+ else if(change==='access'){const elsewhere=join(temp,'elsewhere');await mkdir(elsewhere);await writeFile(config,JSON.stringify({extensionId:'a'.repeat(32),roots:[elsewhere],author:'Local reviewer'}));}
+ else{const base={eventId:randomUUID(),threadId:thread.id,revision:thread.revision+1,occurredAt:new Date().toISOString(),actor:{id:'other',name:'Other'}};const event=change==='opened'?createEventFactory.reopened(base):change==='deleted'?createEventFactory.deleted(base):createEventFactory.relocated({...base,documentPath:'second.md'});const directory=join(root,'.comments','documents');const [bundle]=await readdir(directory);await appendFile(join(directory,bundle!),JSON.stringify(event)+'\n');}
+ await rm(lock);await rejected;
+ expect((await new JsonlThreadRepository(root).readEvents(thread.id)).filter(e=>e.type==='thread.reopened')).toHaveLength(change==='opened'?1:0);
+});
+it.each([false,true])('preserves concurrent comments and response size guard when reopening (oversized %s)',async oversized=>{
+ const done:any=await call(resolveRequest(await create()));const thread=done.threads[0].thread;
+ const lock=join(root,'.comments','store.lock');await writeFile(lock,'other');let signal!:()=>void;const entered=new Promise<void>(r=>{signal=r;});
+ const original=JsonlThreadRepository.prototype.append;vi.spyOn(JsonlThreadRepository.prototype,'append').mockImplementation(function(...args){signal();return original.apply(this,args);});
+ const outcome=call(reopenRequest(done)).then(value=>({value}),error=>({error}));await entered;
+ const event=createEventFactory.commentEdited({eventId:randomUUID(),threadId:thread.id,revision:thread.revision+1,occurredAt:new Date().toISOString(),actor:{id:'other',name:'Other'},commentId:thread.comments[0].id,body:oversized?'x'.repeat(1024*1024):'Concurrent edit'});
+ const directory=join(root,'.comments','documents');const [bundle]=await readdir(directory);await appendFile(join(directory,bundle!),JSON.stringify(event)+'\n');await rm(lock);
+ const actual=await outcome;const stored=(await new JsonlThreadRepository(root).list())[0]!;
+ if(oversized){expect('error' in actual && actual.error.message).toMatch(/large|limit/i);expect(stored.status).toBe('resolved');}
+ else{expect('value' in actual && (actual.value as any).threads[0].thread.comments[0].body).toBe('Concurrent edit');expect(stored.status).toBe('open');expect(stored.revision).toBe(thread.revision+2);}
+});

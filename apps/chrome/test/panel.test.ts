@@ -13,7 +13,7 @@ const snapshot = (): DocumentSnapshot => {
 };
 function setup() {
   const dom=new JSDOM('<body></body>'); const doc=dom.window.document;
-  const actions={create:vi.fn(async()=>{}),reply:vi.fn(async()=>{}),resolve:vi.fn(async()=>{}),reveal:vi.fn(),edit:vi.fn(async()=>{}),delete:vi.fn(async()=>{})};
+  const actions={create:vi.fn(async()=>{}),reply:vi.fn(async()=>{}),resolve:vi.fn(async()=>{}),reopen:vi.fn(async()=>{}),reveal:vi.fn(),edit:vi.fn(async()=>{}),delete:vi.fn(async()=>{})};
   const panel=createCommentPanel(doc,actions); doc.body.append(panel.element);
   const button=(action:string)=>panel.element.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!;
   const thread=(id:string)=>panel.element.querySelector<HTMLElement>(`[data-thread-id="${id}"]`)!;
@@ -107,4 +107,15 @@ describe('comment panel', () => {
     expect(button('create').disabled).toBe(true); expect(thread('open').querySelector<HTMLButtonElement>('[data-action="reply"]')!.disabled).toBe(true);
     expect(thread('open').querySelector<HTMLButtonElement>('[data-action="resolve"]')!.disabled).toBe(true);
   });
+});
+
+it('keeps Reopen in the heading, blocks duplicate clicks and reports failed reopening',async()=>{
+ const {panel,thread,actions}=setup();panel.show(snapshot());
+ const reopen=thread('done').querySelector<HTMLButtonElement>('[data-action="reopen"]')!;
+ expect(reopen?.textContent).toBe('Reopen');expect(reopen.parentElement?.className).toBe('sideband-thread-heading');
+ expect(thread('open').querySelector('[data-action="reopen"]')).toBeNull();
+ actions.reopen.mockRejectedValueOnce(new Error('Document changed'));
+ reopen.click();expect(reopen.disabled).toBe(true);await settle();
+ expect(panel.element.textContent).toContain('Document changed');expect(reopen.disabled).toBe(false);
+ panel.setHideResolved(true);expect(thread('done')).toBeNull();
 });

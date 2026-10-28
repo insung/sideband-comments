@@ -119,6 +119,13 @@ describe('Chrome reader integration', () => {
       await vi.waitFor(()=>expect(doc.querySelectorAll('[data-comment-id]')).toHaveLength(1));
       const final=await new JsonlThreadRepository(root).listByDocument('doc.md');
       expect(final[0]?.status).toBe('resolved');expect(final[0]?.comments.map(c=>c.body)).toEqual(['Edited through the reader']);
+      doc.querySelector<HTMLButtonElement>('[data-action="reopen"]')!.click();
+      await vi.waitFor(()=>expect(doc.querySelector('.sideband-thread-state')!.textContent).toBe('Open'));
+      doc.querySelector<HTMLTextAreaElement>('[name="reply"]')!.value='Reply after reopening';
+      doc.querySelector<HTMLButtonElement>('[data-action="reply"]')!.click();
+      await vi.waitFor(()=>expect(doc.querySelector('.sideband-thread')!.textContent).toContain('Reply after reopening'));
+      const reopened=await new JsonlThreadRepository(root).listByDocument('doc.md');
+      expect(reopened[0]?.status).toBe('open');expect(reopened[0]?.comments.map(c=>c.body)).toEqual(['Edited through the reader','Reply after reopening']);
       expect(await readFile(file,'utf8')).toBe(source);
     } finally { dom.window.close(); await rm(root,{recursive:true,force:true}); }
   });
