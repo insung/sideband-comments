@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import assert from 'node:assert/strict';
-import {readFile, writeFile, mkdir} from 'node:fs/promises';
+import {readFile, readdir, writeFile, mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {CommentService, captureAnchor} from '@sideband-comments/core';
 import {JsonlThreadRepository} from '@sideband-comments/jsonl-store';
@@ -47,12 +48,15 @@ export async function run() {
   assert.equal(loaded().get(a.open.id),original);
   assert.equal(loaded().get(a.resolved.id).comments.length,2);
   passed.push('external reply updates changed thread and preserves unrelated thread');
-  const file=a.repository.threadFile(a.open.id);
-  const lines=async()=> (await readFile(file,'utf8')).trim().split('\n').length;
-  const before=await lines();
+  const eventCount=async()=> {
+    const files=await readdir(a.repository.documentsDirectory);
+    const bundles=await Promise.all(files.filter(file=>file.endsWith('.jsonl')).map(file=>readFile(join(a.repository.documentsDirectory,file),'utf8')));
+    return bundles.flatMap(raw=>raw.trim().split(/\r?\n/)).filter(line=>JSON.parse(line).threadId===a.open.id).length;
+  };
+  const before=await eventCount();
   await Promise.all([comments.submit({thread:original,text:'exactly once'}),comments.submit({thread:original,text:'exactly once'})]);
   await comments.reloadActive('watcher duplicate');
-  assert.equal(await lines(),before+1);
+  assert.equal(await eventCount(),before+1);
   assert.equal(loaded().get(a.open.id),original);
   passed.push('concurrent reply submissions and watcher reload append exactly one event');
   const draft=comments.controller.createCommentThread(a.uri,new vscode.Range(2,0,2,17),[]);

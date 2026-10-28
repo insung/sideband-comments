@@ -15,6 +15,8 @@ function fixture(
     minAppVersion: "1.5.0"
   };
   return {
+    chromePackage: { version: vscodeVersion },
+    chromeManifest: { version: vscodeVersion },
     vscodePackage: {
       version: vscodeVersion,
       scripts: { package: `sideband-comments-vscode-${vscodeVersion}.vsix` }
@@ -35,8 +37,22 @@ test("accepts VS Code and Obsidian on the same version", () => {
   assert.deepEqual(assertAppVersionPolicy(fixture("0.2.7", "0.2.7")), {
     vscode: "0.2.7",
     obsidian: "0.2.7",
+    chrome: "0.2.7",
     plugin: "0.2.7"
   });
+});
+
+test("rejects Chrome on a different release version", () => {
+  const input = fixture("0.2.7", "0.2.7");
+  input.chromePackage.version = "0.2.6";
+  input.chromeManifest.version = "0.2.6";
+  assert.throws(() => assertAppVersionPolicy(input), /Chrome.*same version/);
+});
+
+test("rejects a Chrome manifest that disagrees with its package", () => {
+  const input = fixture("0.2.7", "0.2.7");
+  input.chromeManifest.version = "0.2.6";
+  assert.throws(() => assertAppVersionPolicy(input), /Chrome.*match exactly/);
 });
 
 test("rejects different patch versions", () => {

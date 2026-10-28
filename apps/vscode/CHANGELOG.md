@@ -3,6 +3,49 @@
 Release notes for the Sideband Comments extension for VS Code. Notes for the Obsidian plugin
 are published with each [GitHub release](https://github.com/insung/sideband-comments/releases).
 
+## 2.0.0
+
+**Sideband Comments comes to Chrome.** Read local Markdown and continue the same document review in Chrome, VS Code and Obsidian, with comments stored beside your project in one shared `.comments/` history. The Chrome extension makes this workflow available without running VS Code.
+
+This release introduces Chrome as a new supported client; existing comment history remains compatible. Chrome initially supports macOS with Node.js 20 or newer and a separately installed Native Messaging host. Install it in developer mode using the [Chrome setup guide](../../docs/chrome.md); The initial Chrome Web Store submission is awaiting review; store availability will be announced after publication.
+
+### Added
+
+- Read local Markdown in Chrome with a GitHub light theme, H1/H2 contents, Mermaid, syntax highlighting and a shared comment panel using a separately installed macOS Native Messaging host.
+- Create comments and replies, edit your own comments by double-clicking or pressing Enter, confirm deletions and resolve threads while preserving Markdown and append-only history.
+- Keep resolved-comment visibility in Chrome Settings and remember panel widths across documents.
+- Reopen a resolved Chrome thread and continue replying when its anchor is valid, while preserving the original quote and comment history ([#13](https://github.com/insung/sideband-comments/pull/13)).
+- Install the agent tools as a Claude Code or Codex plugin and use the setup skill to choose which editor integrations to install when upgrading from the published 1.0.9 line.
+
+### Changed
+
+- Use one release version for Chrome, VS Code, Obsidian and the agent plugins, with automatic checks for Chrome package and manifest mismatches.
+- Match Chrome comment action names and placement to the editor experience while restricting Chrome edits and deletions to the configured author name.
+- Reply to orphaned review threads from the agent when the reviewed text was removed, preserving their original quote and unresolved anchor state.
+
+### Fixed
+
+- Keep YAML frontmatter out of the Chrome article and contents without shifting comment anchors.
+- Map formatted text, punctuation in link labels and whole-paragraph browser selections to source positions without guessing ambiguous locations.
+- Reject stale document or comment changes under the shared write lock and preserve unsaved edit drafts after conflicts.
+
+### Distribution
+
+- Load the Chrome extension in developer mode and separately register the Native Messaging host with Node.js 20 or newer on macOS.
+- Separate the store-upload ZIP from the development ZIP without changing the development extension ID, local host settings or project comment stores during packaging.
+- Register the separately installed host with the actual store extension ID when deliberately switching to a future store installation.
+- Distinguish the initial Chrome store submission, which predates Reopen, from this release candidate, which includes it; the pending submission is not the final release archive.
+- Distribute Obsidian assets through the bare version GitHub Release and offer the VS Code VSIX for manual installation; Marketplace publication is deferred for this release.
+
+### Verification
+
+- Passed typecheck, 266 application tests and 10 version-policy tests for the integrated 2.0.0 candidate, using TMPDIR=/private/tmp for native-host tests on macOS.
+- Passed 11 VS Code Extension Host scenarios covering shared replies, duplicate submission, resolved visibility, multi-root navigation and delayed reads or writes.
+- Verified full Chrome restart, persisted comments and reply creation while VS Code was closed in the preceding development build.
+- Verified shared Chrome replies, edited comments, deleted replies and resolved state in the preceding installed VS Code and Obsidian integrations.
+- Verified panel resizing and persistence, narrow-screen layouts and stale-document rejection in the preceding development build.
+- Verified Chrome Reopen, reply persistence after refresh and unchanged Markdown through the integration checks recorded in PR #13; the publisher subsequently reported manual verification of the final 2.0.0 installations in VS Code and Obsidian.
+
 ## 1.0.11
 
 ### Added

@@ -46,7 +46,7 @@ git status --porcelain
 
 ### 공통 버전은 릴리즈마다 한 번만 올린다
 
-Chrome·VS Code·Obsidian·에이전트 플러그인은 릴리즈마다 동일한 버전 번호를 사용한다. 한쪽만 바뀐 릴리즈도 모두 함께 올린다. 기존 앱·플러그인의 버전 불일치는 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
+Chrome·VS Code·Obsidian·에이전트 플러그인은 릴리즈마다 동일한 버전 번호를 사용한다. 한쪽만 바뀐 릴리즈도 모두 함께 올린다. 공통 버전 불일치는 `npm run check:app-versions` 가 막는다. 바꿀 파일은 「VS Code 배포」 2번에 있다.
 
 새 번호는 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호다. 사용자가 릴리즈를 지시해 CHANGELOG 를 쓸 때 **한 번** 올린다. 기능 작업 중에는 올리지 않고, 로컬 검증은 지금 버전으로 다시 패키징하고 `--force`로 덮어쓴다.
 
@@ -79,15 +79,16 @@ npm run typecheck && npm test && npm run build
 
 ### 2. 버전 올리기와 릴리즈 노트 — 릴리즈마다 한 번
 
-사용자가 릴리즈를 지시하면 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호로 **두 앱과 플러그인을 같은 번호로 함께** 올린다. 아래 값을 모두 바꾼다. 하나라도 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
+사용자가 릴리즈를 지시하면 `apps/vscode/CHANGELOG.md` 맨 위 버전의 다음 번호로 위 공통 버전 규칙에 따라 함께 올린다. 아래 값을 모두 바꾼다. 하나라도 다르면 `check-app-version-line.mjs`가 막는다. 같은 자리에서 4번의 릴리즈 노트를 쓴다.
 
 | 파일 | 바꿀 값 |
 | --- | --- |
+| `apps/chrome/package.json`, `apps/chrome/manifest.json` | `version` |
 | `apps/vscode/package.json` | `version`, `scripts.package` 의 `.vsix` 파일명 |
 | `apps/obsidian/package.json` | `version`, `scripts.package` 의 `.zip` 파일명 |
 | `apps/obsidian/manifest.json`, `manifest.json` | `version` (두 파일은 완전히 같아야 한다) |
 | `versions.json` | 새 버전을 `minAppVersion` 에 매핑하는 항목 |
-| `package-lock.json` | `apps/vscode`, `apps/obsidian` 의 `version` |
+| `package-lock.json` | `apps/chrome`, `apps/vscode`, `apps/obsidian` 의 `version` |
 | `plugin/.claude-plugin/plugin.json`, `plugin/.codex-plugin/plugin.json` | `version` |
 
 ```bash

@@ -8,20 +8,36 @@
 
 <p align="center"><strong>English</strong> · <a href="README.ko.md">한국어</a></p>
 
-![Sideband Comments keeps one comment history across Obsidian and VS Code](media/release/sideband-comments-1.0.0-hero.png)
+![Code in VS Code, Markdown in Obsidian and Chrome, and Claude Code working with their review threads](docs/assets/readme/sideband-comments-2.0.0-hero-v4.png)
+
+*Illustrated workflow with sample code and simplified app layouts. Claude Code is an optional, separately installed integration.*
 
 AI conversations move fast, but the reasoning behind a change often disappears into chat history. Sideband Comments anchors questions, replies, and decisions to the exact text under review while keeping the document itself clean.
 
-Open the same review history in Obsidian or VS Code. Writers, knowledge workers, developers, and file-aware AI tools can discuss a document, inspect the resulting change, and resolve the thread only after it has been verified.
+Review source code in VS Code and Markdown in Chrome, VS Code or Obsidian. Comments on related files stay in the project's local review history. People inspect the resulting changes and decide when to resolve a thread. With the optional agent plugin, ask Claude Code or Codex to read the comments, surrounding code and related documentation, make the requested changes, and reply on the threads.
 
-## Chrome (local preview)
+## Why I built this
 
-A Chrome reader with GitHub styling, Mermaid, a left TOC and a right Sideband comment panel is available for local development. It uses a Native Messaging host and works without VS Code running. See [macOS installation, usage and validation](docs/chrome.md). This preview is loaded in developer mode; it is not published to the Chrome Web Store.
+While working with Claude, I kept quoting passages from a document into chat: “Change this paragraph.” “Fix that sentence.” Each request led to another, until I lost sight of the goal I had started with.
+
+I built Sideband Comments to keep those requests attached to the file being reviewed. A comment points to the code or passage under discussion, the agent can read it when asked, and its reply stays in the same thread. I can review the changed code and documentation alongside the requests and reasons for the changes before deciding whether the work is done.
+
+The aim is to keep the document, the conversation, and the original goal in view together. Sideband provides a place for that context; I still decide what to ask, what to accept, and when to resolve a thread.
+
+Write the goal in the document so it can be read again. In a new session, ask the agent to read that same accessible document and its comment history; Sideband does not automatically transfer the previous chat or guarantee that the agent will understand every part of it.
+
+![Repeated changes to code and documentation make the original goal harder to keep in view](docs/assets/story/v2/02-keep-the-goal-in-view.png)
+
+[Follow the five-scene story: from repeated revisions to a reviewed change.](docs/review-story.md)
+
+## Chrome
+
+A Chrome reader with GitHub styling, Mermaid, a left TOC and a right Sideband comment panel is available for local development. It uses a Native Messaging host and works without VS Code running. See [macOS installation, usage and validation](docs/chrome.md). The initial Chrome Web Store submission is awaiting review. Until it is published, use the developer-mode installation described in the guide.
 
 ## Why
 
 - **Context attached to the exact text** — keep each discussion beside the passage, paragraph, or code range it concerns.
-- **One review history across two editors** — continue the same conversation in Obsidian and VS Code.
+- **One review history across your tools** — continue the same local conversation in Chrome, VS Code and Obsidian; ask your agent to read it when needed.
 - **Original text preserved for verification** — compare what was reviewed with what the document says now.
 - **Local-first, append-only storage** — retain the full discussion history without embedding review data in the document.
 
@@ -29,18 +45,18 @@ A Chrome reader with GitHub styling, Mermaid, a left TOC and a right Sideband co
 
 Sideband Comments is not limited to developer code review. A developer can review AI-assisted code in VS Code while a writer, researcher, or knowledge worker reviews AI-assisted prose in Obsidian. Both workflows use the same document-grounded conversation model: comment on an exact passage, inspect the change, and resolve only after verification.
 
-![A developer and a writer using the same Sideband Comments workflow](media/release/sideband-comments-audiences.png)
-
 When a file-aware AI tool has access to the workspace, instructions and replies can stay attached to the source instead of being repeatedly transferred through a separate chat. Sideband Comments does not call an AI service and requires no MCP server; the agent skill it ships is optional. It provides the durable local review layer that people and tools can share.
 
 ## How it works
 
-1. Select the exact text or code that needs discussion.
-2. Create a Sideband comment and continue the thread with people or a workspace-aware AI tool.
-3. Review the creation-time original text, the current document, and the full reply history together.
-4. Resolve the thread only after the resulting document has been verified.
+1. Write the goal in your project notes and select the exact code or passage that needs discussion.
+2. Leave a comment explaining what needs to change and why.
+3. Ask your agent to read the file, surrounding logic, related documentation and review threads, make the requested changes, and reply. When quoted text is rewritten, the skill reattaches the thread before replying.
+4. Review the updated code and documentation together, alongside the original quotations and replies. Add a follow-up comment and ask the agent to continue, or resolve the thread when your review is complete.
 
-Markdown and source files remain unchanged when a comment is created, replied to, edited, deleted, resolved, or re-anchored. Both editor extensions share one append-only store:
+![An explicit request to Claude Code leads to sample code and documentation changes and replies for review](docs/assets/story/v2/04-read-code-and-docs.png)
+
+Comment actions leave Markdown and source files unchanged. An AI tool you ask to revise the document can change its contents. Chrome and both editor integrations share one append-only store:
 
 ```text
 .comments/
@@ -151,7 +167,7 @@ npm run build
 
 ## App version policy
 
-VS Code and Obsidian releases always share the same version. A change to only one app still bumps both, so VS Code `1.0.9` ships with Obsidian `1.0.9`. Obsidian's package and manifest versions must match exactly.
+Chrome, VS Code, Obsidian and the agent plugins share one release version, even when only one component changes. Chrome and Obsidian package versions must also match their respective manifests exactly.
 
 `npm test`, the root build, each app package command, and the `App version policy` GitHub Actions check run the same validation:
 
