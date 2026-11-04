@@ -1,0 +1,29 @@
+<idea-plugin>
+    <id>insung.sideband-comments</id>
+    <name>Sideband Comments</name>
+    <vendor url="https://github.com/insung/sideband-comments">insung</vendor>
+    <description><![CDATA[
+    Review threads anchored to quoted text, stored as append-only JSONL in the project's <code>.comments</code> directory.
+    Shares the same comments with the VS Code, Obsidian and Chrome clients and the Claude Code / Codex agent skill.
+    Requires Node.js 20 or later.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Sideband Comments" anchor="right" secondary="false"
+                    icon="AllIcons.Toolwindows.ToolWindowMessages"
+                    factoryClass="dev.insung.sideband.SidebandToolWindowFactory"/>
+        <applicationConfigurable parentId="tools" id="sideband.comments.settings" displayName="Sideband Comments"
+                                 instance="dev.insung.sideband.SidebandConfigurable"/>
+        <postStartupActivity implementation="dev.insung.sideband.SidebandStartup"/>
+        <notificationGroup id="Sideband Comments" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <action id="SidebandComments.Add" class="dev.insung.sideband.AddCommentAction"
+                text="Add Sideband Comment" description="Comment on the selected text">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

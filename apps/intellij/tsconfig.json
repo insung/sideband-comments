@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "composite": true, "rootDir": "bridge/src", "outDir": "build/types", "types": ["node"], "tsBuildInfoFile": "build/bridge.tsbuildinfo" },
+  "include": ["bridge/src/**/*.ts"],
+  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/jsonl-store" }]
+}

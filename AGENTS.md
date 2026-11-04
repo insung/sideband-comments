@@ -11,6 +11,7 @@
 | `packages/migrate` | Anchored Comments v2 → Sideband 이관 |
 | `apps/vscode` | VS Code 확장 |
 | `apps/obsidian` | Obsidian 플러그인 |
+| `apps/intellij` | IntelliJ 플러그인 (로컬 설치용, Node 브리지로 `packages/*` 사용) |
 | `plugin` | Claude Code·Codex 플러그인 (에이전트 스킬과 그 도구) |
 
 두 앱은 `packages/*`를 공유한다. 저장소 계층을 고치면 **양쪽 앱이 모두 영향을 받는다.**

@@ -1,0 +1,13 @@
+{
+  "name": "sideband-comments-intellij",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild bridge/src/main.ts --bundle --platform=node --format=cjs --outfile=build/bridge/bridge.cjs"
+  },
+  "dependencies": {
+    "@sideband-comments/core": "0.1.0",
+    "@sideband-comments/jsonl-store": "0.1.0"
+  }
+}

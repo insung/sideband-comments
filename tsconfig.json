@@ -8,6 +8,7 @@
     { "path": "apps/obsidian" },
     { "path": "packages/browser-protocol" },
     { "path": "apps/native-host" },
-    { "path": "apps/chrome" }
+    { "path": "apps/chrome" },
+    { "path": "apps/intellij" }
   ]
 }
